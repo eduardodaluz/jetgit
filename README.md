@@ -35,7 +35,7 @@ Requires Node 20+ and git ≥ 2.31. F5 in this workspace launches the Extension 
 
 ## Requirements
 
-- VS Code or VSCodium ≥ 1.145
+- VS Code or VSCodium ≥ 1.140
 - The built-in Git extension enabled (except for Local History, which also works in plain folders)
 - git CLI on PATH, version ≥ 2.31
 
