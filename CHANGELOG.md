@@ -4,6 +4,13 @@ All notable changes to JetGit are documented here.
 
 ## [0.1.0] — 2026-11-10 (in development)
 
+### Added (milestone 3 — shelves)
+- **Shelves**: named patches (IntelliJ semantics — not stashes). Apply any number of times; "Save to Shelf" copies without reverting; soft-delete with restorable trash.
+- **Shelve Changes** reverts working files (tracked → index version, untracked → removed); **Apply** lands per file with `--3way`, so one conflicted file shows merge-conflict markers without blocking the rest.
+- Shelve straight from a changelist's context menu, or pick a scope via QuickPick.
+- Binary files and deleted files supported byte-exact (`git diff --binary`); CRLF handled by git itself (repo-config driven).
+- Repository state changes now detected via a per-repo signature poller — the public vscode.git API v1 does not expose repository change events on all builds (fixes "failed to attach to repository" on VSCodium).
+
 ### Added (milestone 2 — changelists)
 - **Changelists**: named groups of uncommitted files with one active changelist receiving new changes (IntelliJ-style auto-assign).
 - **Commit a changelist** via `git commit --only`: commits exactly the member files while preserving your existing index (non-member staged files stay staged); untracked members are added and rolled back exactly on failure; hard-block during merge/revert/cherry-pick; commit message pre-filled from the changelist comment.
