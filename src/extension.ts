@@ -16,6 +16,8 @@ import { PlaceholderTreeProvider } from './placeholderTree';
 import { registerPlaceholderCommands } from './placeholderCommands';
 import { ChangelistsController } from './changelists/commands';
 import { ChangelistsDragAndDrop, ChangelistsTreeProvider } from './changelists/tree';
+import { ShelfController } from './shelf/commands';
+import { ShelfTreeProvider } from './shelf/tree';
 
 export function activate(context: vscode.ExtensionContext): void {
   const disposables = new DisposableCollection();
@@ -44,12 +46,14 @@ export function activate(context: vscode.ExtensionContext): void {
   disposables.add(changelistsTreeView);
   disposables.add(changelists.registerCommands());
 
-  // --- M3–M6 placeholders ---
-  disposables.add(
-    vscode.window.createTreeView('jetgitShelves', {
-      treeDataProvider: new PlaceholderTreeProvider(Strings.placeholders.shelvesMilestone, gitApi),
-    }),
-  );
+  // --- M3: Shelves (real implementation) ---
+  const shelves = new ShelfController(gitApi, { changelistEntries: () => changelists.entries() });
+  disposables.add(shelves);
+  const shelvesTree = new ShelfTreeProvider(() => shelves.entries(), shelves.onDidChangeServices);
+  disposables.add(vscode.window.createTreeView('jetgitShelves', { treeDataProvider: shelvesTree }));
+  disposables.add(shelves.registerCommands());
+
+  // --- M4–M6 placeholders ---
   disposables.add(
     vscode.window.createTreeView('jetgitCompare', {
       treeDataProvider: new PlaceholderTreeProvider(Strings.placeholders.compareMilestone, gitApi),

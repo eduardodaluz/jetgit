@@ -86,6 +86,26 @@ export class TempTextFile {
   }
 }
 
+/** A temp file holding raw bytes (patch segments — never text-translated). */
+export class TempBufferFile {
+  private constructor(
+    public readonly path: string,
+    private readonly cleanup: () => Promise<void>,
+  ) {}
+
+  static async create(contents: Buffer): Promise<TempBufferFile> {
+    const tmp = path.join(os.tmpdir(), `jetgit-bin-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`);
+    await fsp.writeFile(tmp, contents);
+    return new TempBufferFile(tmp, async () => {
+      await fsp.rm(tmp, { force: true });
+    });
+  }
+
+  dispose(): Promise<void> {
+    return this.cleanup();
+  }
+}
+
 export class GitCli {
   constructor(private readonly gitPath: () => string) {}
 

@@ -257,6 +257,16 @@
           "when": "view == jetgitChangelists && viewItem == changelistFile"
         },
         {
+          "command": "jetgit.shelf.shelve",
+          "group": "4_jet@1",
+          "when": "view == jetgitChangelists && viewItem == changelist"
+        },
+        {
+          "command": "jetgit.shelf.saveToShelf",
+          "group": "4_jet@2",
+          "when": "view == jetgitChangelists && viewItem == changelist"
+        },
+        {
           "command": "jetgit.shelf.apply",
           "group": "1_jet@1",
           "when": "view == jetgitShelves && viewItem == shelf"

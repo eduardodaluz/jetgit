@@ -8,6 +8,7 @@
  * working (it needs no repository at all).
  */
 import * as vscode from 'vscode';
+import { error as logError } from '../common/log';
 import { GitCli } from './gitCli';
 import type { GitExtensionApi, GitExtensionExports, GitRepository } from './types';
 
@@ -69,6 +70,20 @@ export class GitApiService {
       const api = ext.exports.getAPI(1);
       this.api = api;
       this.stateFlag.available = true;
+      // React when the user disables git at runtime (git.enabled / bad git.path).
+      this.disposables.push(
+        api.onDidChangeState((state) => {
+          if (state === 'disabled') {
+            this.api = undefined;
+            this.stateFlag.available = false;
+            for (const key of [...this.repos.keys()]) {
+              this.repos.delete(key);
+            }
+            this.availableEmitter.fire(false);
+            this.reposEmitter.fire();
+          }
+        }),
+      );
       // The public API v1 does NOT expose repository open/close events —
       // GitLens polls `api.repositories` for the same reason. We poll cheaply
       // and add/remove handles on diff; if a future API adds real events,
@@ -91,7 +106,7 @@ export class GitApiService {
       this.reposEmitter.fire();
     } catch (err) {
       // getAPI(1) throws when the user has git disabled — degrade, don't crash.
-      console.warn('JetGit: built-in Git extension API unavailable', err);
+      logError('built-in Git extension API unavailable (check git.enabled, git.path, and the @builtin Git extension)', err);
     }
   }
 
@@ -116,17 +131,30 @@ export class GitApiService {
       return;
     }
     const cli = new GitCli(() => this.api!.git.path);
+    // The public API v1 does not guarantee repository.onDidChangeState
+    // (verified: VSCodium 1.143 lacks it — "e.onDidChangeState is not a
+    // function"). We ALWAYS feed a per-repo emitter from a state-signature
+    // poller; the native event, when present, is a fast-path trigger only.
+    const stateEmitter = new vscode.EventEmitter<void>();
+    const poll = new RepoStatePoller(repo, () => stateEmitter.fire());
+    this.pollers.push(poll);
+    this.disposables.push(stateEmitter, poll);
     const handle: RepoHandle = {
       api: repo,
       rootUri: repo.rootUri,
-      gitDir: '', // resolved lazily (async rev-parse)
+      gitDir: '', // resolved lazily via ensureGitDir
       cli,
-      onDidChangeState: repo.onDidChangeState,
+      onDidChangeState: stateEmitter.event,
     };
+    if (typeof repo.onDidChangeState === 'function') {
+      this.disposables.push(repo.onDidChangeState(() => poll.checkNow()));
+    }
     void this.resolveGitDir(handle);
     this.repos.set(key, handle);
     this.reposEmitter.fire();
   }
+
+  private pollers: RepoStatePoller[] = [];
 
   private async resolveGitDir(handle: RepoHandle): Promise<void> {
     try {
@@ -138,7 +166,13 @@ export class GitApiService {
   }
 
   private removeRepo(repo: GitRepository): void {
-    if (this.repos.delete(repo.rootUri.toString())) {
+    const key = repo.rootUri.toString();
+    const idx = this.pollers.findIndex((p) => p.repo.rootUri.toString() === key);
+    if (idx !== -1) {
+      const [poller] = this.pollers.splice(idx, 1);
+      poller?.dispose();
+    }
+    if (this.repos.delete(key)) {
       this.reposEmitter.fire();
     }
   }
@@ -171,8 +205,62 @@ export class GitApiService {
     for (const d of this.disposables.splice(0, this.disposables.length)) {
       d.dispose();
     }
+    this.pollers = [];
     this.availableEmitter.dispose();
     this.reposEmitter.dispose();
     this.repos.clear();
+  }
+}
+
+const REPO_POLL_INTERVAL_MS = 1_500;
+
+/**
+ * Detects repository state changes by diffing a cheap signature of the
+ * state snapshot (HEAD, ahead/behind, change counts and paths). Fires the
+ * given callback only when something actually changed, so the debounced
+ * reconcile pipeline upstream is not spammed.
+ */
+class RepoStatePoller implements vscode.Disposable {
+  private timer: NodeJS.Timeout;
+  private lastSignature: string;
+
+  constructor(
+    readonly repo: GitRepository,
+    private readonly fire: () => void,
+  ) {
+    this.lastSignature = this.signature();
+    this.timer = setInterval(() => this.checkNow(), REPO_POLL_INTERVAL_MS);
+  }
+
+  checkNow(): void {
+    const next = this.signature();
+    if (next !== this.lastSignature) {
+      this.lastSignature = next;
+      this.fire();
+    }
+  }
+
+  private signature(): string {
+    const st = this.repo.state;
+    const changes = [
+      ...st.mergeChanges,
+      ...st.indexChanges,
+      ...st.workingTreeChanges,
+      ...st.untrackedChanges,
+    ].map((c) => `${c.uri.toString()}#${c.status ?? -1}`);
+    // JSON of primitives — stable, cheap, collision-safe enough for diffing.
+    return JSON.stringify([
+      st.HEAD?.name ?? null,
+      st.HEAD?.commit ?? null,
+      st.HEAD?.ahead ?? null,
+      st.HEAD?.behind ?? null,
+      st.HEAD?.upstream?.remote ?? null,
+      st.HEAD?.upstream?.name ?? null,
+      changes,
+    ]);
+  }
+
+  dispose(): void {
+    clearInterval(this.timer);
   }
 }

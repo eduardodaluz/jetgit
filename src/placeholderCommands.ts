@@ -10,13 +10,6 @@ import { showLog } from './common/log';
 import { Strings } from './strings';
 
 const MILESTONES: Record<string, { feature: string; milestone: string }> = {
-  'jetgit.shelf.shelve': { feature: 'Shelve Changes', milestone: 'milestone 3' },
-  'jetgit.shelf.saveToShelf': { feature: 'Save to Shelf', milestone: 'milestone 3' },
-  'jetgit.shelf.apply': { feature: 'Apply Shelf', milestone: 'milestone 3' },
-  'jetgit.shelf.applyAndDelete': { feature: 'Apply Shelf and Delete', milestone: 'milestone 3' },
-  'jetgit.shelf.rename': { feature: 'Rename Shelf', milestone: 'milestone 3' },
-  'jetgit.shelf.delete': { feature: 'Delete Shelf', milestone: 'milestone 3' },
-  'jetgit.shelf.restoreDeleted': { feature: 'Restore Deleted Shelf', milestone: 'milestone 3' },
   'jetgit.localHistory.putLabel': { feature: 'Local History labels', milestone: 'milestone 4' },
   'jetgit.localHistory.restore': { feature: 'Restore from Local History', milestone: 'milestone 4' },
   'jetgit.localHistory.restoreDeleted': { feature: 'Restore deleted files', milestone: 'milestone 4' },

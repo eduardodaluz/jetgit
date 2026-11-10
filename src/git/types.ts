@@ -37,6 +37,8 @@ export interface GitBranch {
   readonly commit: string;
   readonly upstream?: GitRemoteRef;
   readonly nameWithRemote?: string;
+  readonly ahead?: number;
+  readonly behind?: number;
 }
 
 export interface GitRemoteRef {
@@ -78,7 +80,8 @@ export interface GitRepositoryState {
 export interface GitRepository {
   readonly rootUri: vscode.Uri;
   readonly state: GitRepositoryState;
-  onDidChangeState: vscode.Event<void>;
+  /** NOT part of the public API v1 in all builds — never assume it exists. */
+  onDidChangeState?: vscode.Event<void>;
   blame(path: string): Promise<GitCommit & { readonly lines: string[] }>;
   log(options?: GitLogOptions): Promise<GitCommit[]>;
   show(ref: string, path: string): Promise<string>;

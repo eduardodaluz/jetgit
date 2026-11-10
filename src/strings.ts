@@ -37,6 +37,17 @@ export const Strings = {
     viewPlaceholder: 'Shelves store patches of your changes, applicable any number of times.',
     namePrompt: 'Shelf name',
     applyConfirm: 'Apply shelf "{name}"? Conflicting files will show merge conflicts.',
+    nothingToShelve: 'Nothing to shelve — the selection has no changes.',
+    shelveFailed: 'Shelve failed',
+    missingPatch: 'Shelf "{name}" has a missing patch file and cannot be applied.',
+    applyFileFailed: 'git apply failed for a shelf segment',
+    applyPartial: 'Shelf "{name}": {applied} of {total} file(s) applied.',
+    appliedSummary: 'Shelf "{name}" applied ({count} file(s)).',
+    renamePrompt: 'New shelf name',
+    deleteConfirm: 'Delete shelf "{name}"? You can restore it from the trash afterwards.',
+    restorePrompt: 'Restore a deleted shelf',
+    scopePrompt: 'Shelve what?',
+    scopeAllChanges: 'All current changes',
   },
 
   localHistory: {
