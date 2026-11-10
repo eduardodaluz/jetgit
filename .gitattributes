@@ -1,0 +1,12 @@
+# Normalize all text files to LF in the repository; working-copy EOL is left
+# to each platform's git (core.autocrlf) — JetGit must not ship platform-specific
+# line endings that pollute diffs in CI.
+* text=auto eol=lf
+
+# Windows script that must keep CRLF for cmd.exe
+*.bat text eol=crlf
+
+# Binaries
+*.png binary
+*.vsix binary
+media/*.svg text
