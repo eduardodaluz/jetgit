@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run check-types
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Build tests
+        run: npm run build-tests
+
+      - name: Integration tests
+        env:
+          JETGIT_FIXTURES_DIR: ${{ runner.temp }}/jetgit-fixtures
+        shell: bash
+        run: |
+          node scripts/build-fixtures.mjs
+          node dist/test/runTest.js
+
+      - name: Package (valid VSIX)
+        if: matrix.os == 'ubuntu-latest'
+        run: npx vsce package
+
+      - name: Upload VSIX artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jetgit-vsix
+          path: '*.vsix'

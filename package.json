@@ -1,0 +1,473 @@
+{
+  "name": "jetgit",
+  "displayName": "JetGit",
+  "description": "Changelists, shelves, local history, inline blame and branch compare for Git — a calmer, more capable source control workflow for VS Code.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "publisher": "webne",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/webne/jetgit"
+  },
+  "engines": {
+    "vscode": "^1.145.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "changelist",
+    "shelf",
+    "local history",
+    "blame",
+    "compare",
+    "version control"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "jetgit",
+          "title": "JetGit",
+          "icon": "./media/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "jetgit": [
+        {
+          "id": "jetgitChangelists",
+          "name": "Changelists"
+        },
+        {
+          "id": "jetgitShelves",
+          "name": "Shelves"
+        },
+        {
+          "id": "jetgitCompare",
+          "name": "Compare"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "jetgitCompare",
+        "contents": "Compare your work with any branch, tag or commit.\n[Compare with Branch…](command:jetgit.compare.withRef)"
+      },
+      {
+        "view": "jetgitChangelists",
+        "contents": "Group your uncommitted changes into changelists. New changes join the active changelist.\n[New Changelist](command:jetgit.changelists.new)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "jetgit.changelists.new",
+        "title": "New Changelist",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.changelists.rename",
+        "title": "Rename Changelist",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.changelists.editComment",
+        "title": "Edit Changelist Comment",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.changelists.delete",
+        "title": "Delete Changelist",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.changelists.setActive",
+        "title": "Make Active Changelist",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.changelists.moveFiles",
+        "title": "Move Files to Changelist…",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.changelists.commit",
+        "title": "Commit Changelist…",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.changelists.removeEmpty",
+        "title": "Delete Empty Changelists",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.shelf.shelve",
+        "title": "Shelve Changes…",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.shelf.saveToShelf",
+        "title": "Save to Shelf…",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.shelf.apply",
+        "title": "Apply Shelf",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.shelf.applyAndDelete",
+        "title": "Apply Shelf and Delete",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.shelf.rename",
+        "title": "Rename Shelf",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.shelf.delete",
+        "title": "Delete Shelf",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.shelf.restoreDeleted",
+        "title": "Restore Deleted Shelf…",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.localHistory.putLabel",
+        "title": "Put Label",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.localHistory.restore",
+        "title": "Restore from Local History",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.localHistory.restoreDeleted",
+        "title": "Restore Deleted File from Local History…",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.localHistory.showDiff",
+        "title": "Compare with Local History",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.localHistory.clear",
+        "title": "Clear Local History",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.localHistory.storageUsage",
+        "title": "Local History Storage Usage",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.blame.setMode",
+        "title": "Set Blame Mode…",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.blame.openCommit",
+        "title": "Open Commit",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.blame.copySha",
+        "title": "Copy Commit SHA",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.compare.withRef",
+        "title": "Compare with Branch, Tag or Ref…",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.compare.workingTree",
+        "title": "Compare Working Tree with Ref…",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.compare.getFileFromRef",
+        "title": "Get from Branch",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.compare.openCommitFiles",
+        "title": "Show Commit File Diffs",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.compare.clear",
+        "title": "Clear Comparison",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.showLog",
+        "title": "Show Log",
+        "category": "JetGit"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "jetgit.changelists.new",
+          "group": "navigation",
+          "when": "view == jetgitChangelists"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "jetgit.changelists.commit",
+          "group": "1_jet@1",
+          "when": "view == jetgitChangelists && viewItem == changelist"
+        },
+        {
+          "command": "jetgit.changelists.setActive",
+          "group": "1_jet@2",
+          "when": "view == jetgitChangelists && viewItem == changelist"
+        },
+        {
+          "command": "jetgit.changelists.editComment",
+          "group": "2_jet@1",
+          "when": "view == jetgitChangelists && viewItem == changelist"
+        },
+        {
+          "command": "jetgit.changelists.rename",
+          "group": "2_jet@2",
+          "when": "view == jetgitChangelists && viewItem == changelist"
+        },
+        {
+          "command": "jetgit.changelists.delete",
+          "group": "3_jet@1",
+          "when": "view == jetgitChangelists && viewItem == changelist"
+        },
+        {
+          "command": "jetgit.changelists.moveFiles",
+          "group": "1_jet@1",
+          "when": "view == jetgitChangelists && viewItem == changelistFile"
+        },
+        {
+          "command": "jetgit.shelf.apply",
+          "group": "1_jet@1",
+          "when": "view == jetgitShelves && viewItem == shelf"
+        },
+        {
+          "command": "jetgit.shelf.applyAndDelete",
+          "group": "1_jet@2",
+          "when": "view == jetgitShelves && viewItem == shelf"
+        },
+        {
+          "command": "jetgit.shelf.rename",
+          "group": "2_jet@1",
+          "when": "view == jetgitShelves && viewItem == shelf"
+        },
+        {
+          "command": "jetgit.shelf.delete",
+          "group": "3_jet@1",
+          "when": "view == jetgitShelves && viewItem == shelf"
+        },
+        {
+          "command": "jetgit.compare.getFileFromRef",
+          "group": "1_jet@1",
+          "when": "view == jetgitCompare && viewItem == compareFile"
+        }
+      ],
+      "editor/context": [
+        {
+          "submenu": "jetgit.localHistory",
+          "group": "9_jetgit"
+        }
+      ],
+      "jetgit.localHistory": [
+        {
+          "command": "jetgit.localHistory.showDiff"
+        },
+        {
+          "command": "jetgit.localHistory.putLabel"
+        },
+        {
+          "command": "jetgit.localHistory.restoreDeleted"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "jetgit.changelists.rename",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.changelists.editComment",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.changelists.delete",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.changelists.setActive",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.changelists.moveFiles",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.shelf.apply",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.shelf.applyAndDelete",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.shelf.rename",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.shelf.delete",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.blame.openCommit",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.compare.getFileFromRef",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.compare.openCommitFiles",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.compare.clear",
+          "when": "false"
+        }
+      ]
+    },
+    "submenus": [
+      {
+        "id": "jetgit.localHistory",
+        "label": "Local History"
+      }
+    ],
+    "configuration": {
+      "title": "JetGit",
+      "properties": {
+        "jetgit.changelists.autoAssign": {
+          "type": "boolean",
+          "default": true,
+          "description": "Assign newly modified files to the active changelist."
+        },
+        "jetgit.blame.mode": {
+          "type": "string",
+          "enum": [
+            "off",
+            "currentLine",
+            "wholeFile"
+          ],
+          "default": "currentLine",
+          "description": "Inline blame mode. The built-in Git blame decoration lives in the setting git.blame.editorDecoration.enabled."
+        },
+        "jetgit.blame.coloring": {
+          "type": "boolean",
+          "default": true,
+          "description": "Color the blame annotation by author."
+        },
+        "jetgit.blame.format": {
+          "type": "string",
+          "default": "{author} · {date}",
+          "description": "Annotation template. Placeholders: {author}, {date}, {sha}, {summary}."
+        },
+        "jetgit.blame.ignoreWhitespace": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ignore whitespace changes when computing blame."
+        },
+        "jetgit.blame.maxFileSizeKB": {
+          "type": "number",
+          "default": 1024,
+          "description": "Skip inline blame for files larger than this size."
+        },
+        "jetgit.localHistory.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Record file snapshots in Local History. Works without any Git repository."
+        },
+        "jetgit.localHistory.retentionDays": {
+          "type": "number",
+          "default": 5,
+          "description": "Days to keep Local History snapshots."
+        },
+        "jetgit.localHistory.maxSnapshotsPerFile": {
+          "type": "number",
+          "default": 50,
+          "description": "Maximum snapshots kept per file (labeled snapshots are always kept)."
+        },
+        "jetgit.localHistory.maxFileSizeKB": {
+          "type": "number",
+          "default": 2048,
+          "description": "Skip snapshotting files larger than this size."
+        },
+        "jetgit.localHistory.debounceMs": {
+          "type": "number",
+          "default": 1000,
+          "description": "Debounce interval before a changed file is snapshotted."
+        },
+        "jetgit.shelf.confirmApply": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask for confirmation before applying a shelf."
+        },
+        "jetgit.compare.maxCommitEntries": {
+          "type": "number",
+          "default": 200,
+          "description": "Maximum commits listed per direction in a comparison."
+        },
+        "jetgit.log.level": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "error"
+          ],
+          "default": "info",
+          "description": "Log level for the JetGit output channel."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run check-types && npm run bundle",
+    "check-types": "tsc --noEmit",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "bundle": "node esbuild.js --production",
+    "build-tests": "node scripts/clean.mjs dist/test && node esbuild.js --test",
+    "test:unit": "vitest run",
+    "test:integration": "node scripts/kill-stale-test-hosts.mjs && npm run build-tests && node ./dist/test/runTest.js",
+    "test": "npm run test:unit && npm run test:integration",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.19.0",
+    "@types/vscode": "1.145.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.3.0",
+    "esbuild": "^0.25.0",
+    "mocha": "^10.8.2",
+    "ovsx": "^0.10.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

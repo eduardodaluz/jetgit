@@ -1,0 +1,71 @@
+/**
+ * ALL user-facing strings live here (English for the MVP, i18n-ready).
+ * HARD RULE: the word "IntelliJ" must never appear in this file, in
+ * package.json, or anywhere user-facing outside README.md.
+ */
+
+export const Strings = {
+  extension: {
+    displayName: 'JetGit',
+  },
+
+  gitAvailability: {
+    requiresGit: 'JetGit requires the built-in Git extension. Enable it via the "git.enabled" setting.',
+    noRepositories: 'No Git repository found in this workspace.',
+  },
+
+  changelists: {
+    defaultName: 'Changes',
+    viewPlaceholder: 'Changelists group your uncommitted changes. This milestone ships in an upcoming build.',
+    newChangelistPrompt: 'Changelist name',
+    renamePrompt: 'New name',
+    commentPrompt: 'Comment (pre-fills the commit message)',
+    deleteConfirm: 'Delete changelist "{name}"? Its files move to "{active}".',
+    commitMessagePrompt: 'Commit message',
+    movePrompt: 'Move to changelist',
+    pickRepoPrompt: 'Repository',
+    commitNoChanges: 'Changelist "{name}" has no changes to commit.',
+    commitPartialUnsupported: 'Partial commits are not supported while a merge, revert or cherry-pick is in progress.',
+    commitFailed: 'Commit failed',
+    commitGpgFailed: 'Commit failed: GPG signing error. Check your GPG agent (e.g. export GPG_TTY=$(tty)).',
+    commitPathspecChanged: 'Some changelist files changed on disk while committing — the changelist was refreshed, please retry.',
+    committedSummary: 'Committed {count} file(s) from "{name}".',
+    movedTo: 'Moved {count} file(s) to "{name}".',
+  },
+
+  shelf: {
+    viewPlaceholder: 'Shelves store patches of your changes, applicable any number of times.',
+    namePrompt: 'Shelf name',
+    applyConfirm: 'Apply shelf "{name}"? Conflicting files will show merge conflicts.',
+  },
+
+  localHistory: {
+    viewPlaceholder: 'Local History records file snapshots independently of Git.',
+    labelPrompt: 'Label',
+    restoreConfirm: 'Restore "{file}" to the snapshot from {time}?',
+    safetyNote: 'A safety snapshot of the current content is taken first.',
+  },
+
+  blame: {
+    openCommit: 'Open Commit',
+    copySha: 'Copy Commit SHA',
+  },
+
+  compare: {
+    viewPlaceholder: 'Compare your work with any branch, tag or commit.',
+    refPrompt: 'Compare with branch, tag or ref',
+    getFileConfirm: 'Overwrite the working-tree content of {file} with the version from {ref}?',
+  },
+
+  errors: {
+    showLog: 'Show Log',
+  },
+
+  placeholders: {
+    gitUnavailable: 'JetGit requires the built-in Git extension to be enabled.',
+    changelistsMilestone: 'Changelists — grouping files into named sets and per-changelist commits — ship in milestone 2.',
+    shelvesMilestone: 'Shelves — named patches you can apply any number of times — ship in milestone 3.',
+    compareMilestone: 'Compare with any branch, tag or ref ships in milestone 6.',
+    commandNotYet: '{feature} ships in {milestone}.',
+  },
+} as const;

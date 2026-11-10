@@ -1,0 +1,36 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "npm: compile",
+      "type": "npm",
+      "script": "compile",
+      "problemMatcher": []
+    },
+    {
+      "label": "npm: watch",
+      "type": "npm",
+      "script": "watch",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "npm: check-types",
+      "type": "npm",
+      "script": "check-types",
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "npm: build-tests",
+      "type": "npm",
+      "script": "build-tests",
+      "problemMatcher": []
+    },
+    {
+      "label": "npm: test:unit",
+      "type": "npm",
+      "script": "test:unit",
+      "problemMatcher": []
+    }
+  ]
+}
