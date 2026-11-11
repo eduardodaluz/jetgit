@@ -18,6 +18,7 @@ import { ChangelistsController } from './changelists/commands';
 import { ChangelistsDragAndDrop, ChangelistsTreeProvider } from './changelists/tree';
 import { ShelfController } from './shelf/commands';
 import { ShelfTreeProvider } from './shelf/tree';
+import { LocalHistoryController } from './localHistory/commands';
 
 export function activate(context: vscode.ExtensionContext): void {
   const disposables = new DisposableCollection();
@@ -53,7 +54,11 @@ export function activate(context: vscode.ExtensionContext): void {
   disposables.add(vscode.window.createTreeView('jetgitShelves', { treeDataProvider: shelvesTree }));
   disposables.add(shelves.registerCommands());
 
-  // --- M4–M6 placeholders ---
+  // --- M4: Local History (real implementation; works without git) ---
+  const localHistory = new LocalHistoryController(context);
+  disposables.add(localHistory);
+
+  // --- M5–M6 placeholders ---
   disposables.add(
     vscode.window.createTreeView('jetgitCompare', {
       treeDataProvider: new PlaceholderTreeProvider(Strings.placeholders.compareMilestone, gitApi),

@@ -4,6 +4,14 @@ All notable changes to JetGit are documented here.
 
 ## [0.1.0] — 2026-11-10 (in development)
 
+### Added (milestone 4 — local history)
+- **Local History**: automatic full snapshots (gzip) on every save and external file change — completely independent of Git, works in plain folders.
+- **Restore to any point** via command or the native **Timeline tab** (per file), with diff previews between any snapshot and the working tree.
+- **Restore deleted files**: deletions are recorded as tombstones; the pre-delete content is recoverable byte-identical (directory deletes tombstone all indexed children).
+- **Put Label**: named snapshots that retention never evicts.
+- Retention: 5 days by default (IntelliJ parity), max 50 snapshots per file, 2 MB file-size cap, binary files skipped, storage usage report + Clear All.
+- Product invariant, tested structurally: snapshotting is fire-and-forget — it can never block or fail a save.
+
 ### Added (milestone 3 — shelves)
 - **Shelves**: named patches (IntelliJ semantics — not stashes). Apply any number of times; "Save to Shelf" copies without reverting; soft-delete with restorable trash.
 - **Shelve Changes** reverts working files (tracked → index version, untracked → removed); **Apply** lands per file with `--3way`, so one conflicted file shows merge-conflict markers without blocking the rest.

@@ -12,8 +12,6 @@ import { buildShelfPatch, revertWorkingFiles, type GitDiffAdapter } from '../../
 import { parsePatch } from '../../shelf/patchInfo';
 import * as model from '../../shelf/model';
 
-const fixturesDir = process.env.JETGIT_FIXTURES_DIR ?? os.tmpdir();
-
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@t', ...args], { cwd, stdio: 'pipe' }).toString('utf8');
 }

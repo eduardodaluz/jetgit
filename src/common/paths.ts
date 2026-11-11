@@ -24,6 +24,16 @@ export function keyFor(relPath: string): string {
 }
 
 /**
+ * Map key for an ABSOLUTE path (Local History): separators normalized,
+ * case-folded on win32 (NTFS is case-insensitive). Not filesystem-safe —
+ * hash it (sha1) before using as a directory name.
+ */
+export function keyForAbs(absPath: string): string {
+  const normalized = normalizeRel(absPath);
+  return isWin32 ? normalized.toLowerCase() : normalized;
+}
+
+/**
  * Repo-relative path from an absolute path. Returns undefined when the path
  * is not inside the root. Accepts both separator styles on input.
  */

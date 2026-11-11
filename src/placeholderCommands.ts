@@ -10,12 +10,6 @@ import { showLog } from './common/log';
 import { Strings } from './strings';
 
 const MILESTONES: Record<string, { feature: string; milestone: string }> = {
-  'jetgit.localHistory.putLabel': { feature: 'Local History labels', milestone: 'milestone 4' },
-  'jetgit.localHistory.restore': { feature: 'Restore from Local History', milestone: 'milestone 4' },
-  'jetgit.localHistory.restoreDeleted': { feature: 'Restore deleted files', milestone: 'milestone 4' },
-  'jetgit.localHistory.showDiff': { feature: 'Local History diffs', milestone: 'milestone 4' },
-  'jetgit.localHistory.clear': { feature: 'Clear Local History', milestone: 'milestone 4' },
-  'jetgit.localHistory.storageUsage': { feature: 'Storage usage report', milestone: 'milestone 4' },
   'jetgit.blame.setMode': { feature: 'Blame modes', milestone: 'milestone 5' },
   'jetgit.blame.openCommit': { feature: 'Open Commit', milestone: 'milestone 5' },
   'jetgit.blame.copySha': { feature: 'Copy Commit SHA', milestone: 'milestone 5' },

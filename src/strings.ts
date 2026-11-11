@@ -53,8 +53,19 @@ export const Strings = {
   localHistory: {
     viewPlaceholder: 'Local History records file snapshots independently of Git.',
     labelPrompt: 'Label',
+    labelApplied: 'Labeled local history entry for "{file}".',
     restoreConfirm: 'Restore "{file}" to the snapshot from {time}?',
     safetyNote: 'A safety snapshot of the current content is taken first.',
+    entryPickPrompt: 'Pick a local history snapshot',
+    deletedPickPrompt: 'Pick a file to restore from Local History',
+    restoredInfo: 'Restored "{file}" to the snapshot from {time}.',
+    recreatedInfo: 'Recreated "{file}" from Local History.',
+    noHistory: 'No Local History entries for this file yet.',
+    noDeleted: 'No deleted files to restore.',
+    clearConfirm: 'Clear ALL Local History snapshots for this workspace?',
+    clearedInfo: 'Local History cleared.',
+    usageSummary: 'Local History: {files} file(s), {snapshots} snapshot(s), {size} on disk.\nTop: {top}',
+    restoredBinaryWarn: 'This snapshot cannot be previewed as text — restoring it is still possible.',
   },
 
   blame: {
