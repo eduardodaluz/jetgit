@@ -29,6 +29,7 @@ const testOptions = {
     { in: 'src/test/suite/changelists.test.ts', out: 'test/suite/changelists.test' },
     { in: 'src/test/suite/shelf.test.ts', out: 'test/suite/shelf.test' },
     { in: 'src/test/suite/localHistory.test.ts', out: 'test/suite/localHistory.test' },
+    { in: 'src/test/suite/blame.test.ts', out: 'test/suite/blame.test' },
   ],
   outdir: 'dist',
   // Each test file bundles its own imports (src/ modules live inside the

@@ -10,9 +10,7 @@ import { showLog } from './common/log';
 import { Strings } from './strings';
 
 const MILESTONES: Record<string, { feature: string; milestone: string }> = {
-  'jetgit.blame.setMode': { feature: 'Blame modes', milestone: 'milestone 5' },
-  'jetgit.blame.openCommit': { feature: 'Open Commit', milestone: 'milestone 5' },
-  'jetgit.blame.copySha': { feature: 'Copy Commit SHA', milestone: 'milestone 5' },
+  // M5 blame commands now live in blame/commands.ts.
   'jetgit.compare.withRef': { feature: 'Compare with Ref', milestone: 'milestone 6' },
   'jetgit.compare.workingTree': { feature: 'Compare Working Tree', milestone: 'milestone 6' },
   'jetgit.compare.getFileFromRef': { feature: 'Get from Branch', milestone: 'milestone 6' },

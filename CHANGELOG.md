@@ -4,6 +4,13 @@ All notable changes to JetGit are documented here.
 
 ## [0.1.0] — 2026-11-10 (in development)
 
+### Added (milestone 5 — inline blame)
+- **Inline blame** with three modes (`jetgit.blame.mode`): off, current line (default), whole file — `git blame --porcelain` via the same git binary as the built-in extension, `-L` scoped per cursor line so huge files stay fast (5k lines ≈ 90 ms).
+- **Author coloring**: authors map deterministically to 8 line-highlight buckets per color-theme kind; high-contrast themes get text-only annotations (no backgrounds).
+- **Rich hover**: subject, short SHA, author, date and (on the cursor line) full commit body, with **Open Commit** (file picker → per-file diff against the parent via the new `jetgit-ref:` content provider) and **Copy Commit SHA** links.
+- Format template `jetgit.blame.format` (`{author}`, `{date}`, `{sha}`, `{email}`, `{summary}`), whitespace-ignoring blame (`jetgit.blame.ignoreWhitespace`), and a size cap (`jetgit.blame.maxFileSizeKB`).
+- One-time hint about the built-in Git blame decoration — JetGit never mutates other extensions' settings.
+
 ### Added (milestone 4 — local history)
 - **Local History**: automatic full snapshots (gzip) on every save and external file change — completely independent of Git, works in plain folders.
 - **Restore to any point** via command or the native **Timeline tab** (per file), with diff previews between any snapshot and the working tree.

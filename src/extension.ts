@@ -3,8 +3,8 @@
  * feature logic lives in its own module tree.
  *
  * Milestones: M1 scaffold (log/settings/git bridge/placeholder views),
- * M2 changelists (real tree + DnD + commands). Shelf, Local History, blame
- * and compare land in M3–M6 and keep their placeholder entries until then.
+ * M2 changelists, M3 shelves, M4 local history, M5 inline blame.
+ * Compare lands in M6 and keeps its placeholder until then.
  */
 import * as vscode from 'vscode';
 import { DisposableCollection } from './common/async';
@@ -19,6 +19,8 @@ import { ChangelistsDragAndDrop, ChangelistsTreeProvider } from './changelists/t
 import { ShelfController } from './shelf/commands';
 import { ShelfTreeProvider } from './shelf/tree';
 import { LocalHistoryController } from './localHistory/commands';
+import { BlameController } from './blame/controller';
+import { registerRefContentProvider } from './git/refContent';
 
 export function activate(context: vscode.ExtensionContext): void {
   const disposables = new DisposableCollection();
@@ -58,7 +60,13 @@ export function activate(context: vscode.ExtensionContext): void {
   const localHistory = new LocalHistoryController(context);
   disposables.add(localHistory);
 
-  // --- M5–M6 placeholders ---
+  // --- M5: Inline blame (real implementation; sidecar over vscode.git) ---
+  const blame = new BlameController(gitApi, context);
+  disposables.add(blame);
+  disposables.add(blame.registerCommands());
+  disposables.add(registerRefContentProvider(gitApi));
+
+  // --- M6 placeholder ---
   disposables.add(
     vscode.window.createTreeView('jetgitCompare', {
       treeDataProvider: new PlaceholderTreeProvider(Strings.placeholders.compareMilestone, gitApi),
