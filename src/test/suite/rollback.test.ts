@@ -42,7 +42,7 @@ function adapterFor(cwd: string): RollbackAdapter {
   };
 }
 
-function rmRfRetry(dir: string, attempts = 5): void {
+function rmRfRetry(dir: string, attempts = 10): void {
   for (let i = 0; i < attempts; i++) {
     try {
       clearAttributes(dir);
@@ -52,7 +52,7 @@ function rmRfRetry(dir: string, attempts = 5): void {
       if (i === attempts - 1) {
         throw err;
       }
-      execFileSync('cmd', ['/c', 'ping', '-n', '1', '-w', '200', '127.0.0.1'], { stdio: 'ignore' });
+      execFileSync('cmd', ['/c', 'ping', '-n', '1', '-w', '400', '127.0.0.1'], { stdio: 'ignore' });
     }
   }
 }
@@ -105,7 +105,17 @@ async function rollbackPipeline(
 suite('partial rollback (M6.5)', () => {
   const cleanup: string[] = [];
 
-  teardown(() => {
+  teardown(async function (this: Mocha.Context): Promise<void> {
+    // These suites are the first to open real documents on tmpdir files —
+    // VS Code keeps a watcher/handle on open documents after save, which
+    // EPERMs the rmSync if we race it. Close everything, let the watcher
+    // release, then remove with generous retries (CI runners are slow).
+    try {
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    } catch {
+      // best effort
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
     for (const dir of cleanup.splice(0, cleanup.length)) {
       rmRfRetry(dir);
     }
