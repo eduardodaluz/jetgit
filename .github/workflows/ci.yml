@@ -42,6 +42,7 @@ jobs:
           JETGIT_FIXTURES_DIR: ${{ runner.temp }}/jetgit-fixtures
         shell: bash
         run: |
+          node scripts/build-fixtures.mjs
           run_tests() {
             if [ "$RUNNER_OS" = "Linux" ]; then
               xvfb-run -a node dist/test/runTest.js
