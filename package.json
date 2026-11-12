@@ -4,7 +4,7 @@
   "description": "Changelists, shelves, local history, inline blame and branch compare for Git — a calmer, more capable source control workflow for VS Code.",
   "version": "0.1.0",
   "license": "MIT",
-  "publisher": "webne",
+  "publisher": "eduardodaluz",
   "repository": {
     "type": "git",
     "url": "https://github.com/eduardodaluz/jetgit"
