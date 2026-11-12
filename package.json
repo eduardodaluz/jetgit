@@ -7,7 +7,7 @@
   "publisher": "webne",
   "repository": {
     "type": "git",
-    "url": "https://github.com/webne/jetgit"
+    "url": "https://github.com/eduardodaluz/jetgit"
   },
   "engines": {
     "vscode": "^1.140.0"
