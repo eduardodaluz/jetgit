@@ -110,6 +110,10 @@ suite('shelf patch round-trips (M3)', () => {
   setup(() => {
     sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'jetgit-shelf-'));
     git(sandbox, 'init', '-b', 'main');
+    // Repo-local pin, not per-invocation: the revert step runs through the
+    // extension's own gitCli, which reads repo config — a CI runner with
+    // system autocrlf=true would smudge restored files to CRLF.
+    git(sandbox, 'config', 'core.autocrlf', 'false');
     fs.writeFileSync(path.join(sandbox, 'a.txt'), 'version one\n');
     fs.writeFileSync(path.join(sandbox, 'c.txt'), 'delete me\n');
     fs.writeFileSync(path.join(sandbox, 'img.bin'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02, 0x03]));

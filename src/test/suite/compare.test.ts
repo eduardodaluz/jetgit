@@ -83,6 +83,10 @@ suite('compare with ref (M6)', () => {
     sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'jetgit-compare-'));
     adapter = adapterFor(sandbox);
     git(sandbox, 'init', '-b', 'main');
+    // Repo-local pin, not per-invocation: Get from Branch runs through the
+    // extension's own gitCli, which reads repo config — a CI runner with
+    // system autocrlf=true would smudge the restored bytes to CRLF.
+    git(sandbox, 'config', 'core.autocrlf', 'false');
 
     // Base, then a feature branch with 3 commits (edit, add, rename) while
     // main gets 1 commit of its own — a real divergence in both directions.

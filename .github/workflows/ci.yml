@@ -33,13 +33,21 @@ jobs:
       - name: Build tests
         run: npm run build-tests
 
+      - name: Install xvfb (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Integration tests
         env:
           JETGIT_FIXTURES_DIR: ${{ runner.temp }}/jetgit-fixtures
         shell: bash
         run: |
           node scripts/build-fixtures.mjs
-          node dist/test/runTest.js
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a node dist/test/runTest.js
+          else
+            node dist/test/runTest.js
+          fi
 
       - name: Package (valid VSIX)
         if: matrix.os == 'ubuntu-latest'
