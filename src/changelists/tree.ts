@@ -46,6 +46,7 @@ export class ChangelistsTreeProvider implements vscode.TreeDataProvider<JetGitCh
   constructor(
     private readonly reposProvider: () => Array<{ repo: RepoHandle; service: ChangelistsService }>,
     onDidChangeServices: vscode.Event<void>,
+    private readonly isFileChecked: (repoKey: string, changelistId: string, relPath: string) => boolean,
   ) {
     onDidChangeServices(() => this.changeEmitter.fire());
   }
@@ -129,6 +130,12 @@ export class ChangelistsTreeProvider implements vscode.TreeDataProvider<JetGitCh
       node.contextValue = 'changelist';
       node.description = cl.comment ?? `${cl.files.length} file(s)`;
       node.iconPath = new vscode.ThemeIcon(isActive ? 'check-all' : 'list-unordered');
+      // No visual mixed state in the VS Code checkbox: Enabled means "every
+      // file joins the commit"; anything else renders unchecked (clicking it
+      // checks all — the safe direction for a destructive action).
+      node.checkboxState = cl.files.every((f) => this.isFileChecked(repo.rootUri.toString(), cl.id, f))
+        ? vscode.TreeItemCheckboxState.Checked
+        : vscode.TreeItemCheckboxState.Unchecked;
       node.tooltip = new vscode.MarkdownString(
         `${isActive ? '**Active changelist**\n\n' : ''}**${cl.name}** (${cl.files.length} file(s))${cl.comment ? `\n\n${cl.comment}` : ''}`,
       );
@@ -146,6 +153,10 @@ export class ChangelistsTreeProvider implements vscode.TreeDataProvider<JetGitCh
     node.contextValue = 'changelistFile';
     node.description = path.posix.dirname(relPath) === '.' ? '' : path.posix.dirname(relPath);
     node.iconPath = vscode.ThemeIcon.File;
+    // The per-file checkbox decides whether the file joins the next commit.
+    node.checkboxState = this.isFileChecked(repoKey, changelistId, relPath)
+      ? vscode.TreeItemCheckboxState.Checked
+      : vscode.TreeItemCheckboxState.Unchecked;
     // Opening a change shows the HEAD↔worktree diff (editable right pane) —
     // the plain file stays reachable via the "Open File" context action.
     node.command = { command: 'jetgit.changes.openDiff', title: 'Show Diff', arguments: [node] };

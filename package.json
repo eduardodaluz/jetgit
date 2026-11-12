@@ -102,6 +102,17 @@
         "category": "JetGit"
       },
       {
+        "command": "jetgit.changelists.commitFiles",
+        "title": "Commit Files…",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.changelists.refresh",
+        "title": "Refresh Changelists",
+        "category": "JetGit",
+        "icon": "refresh"
+      },
+      {
         "command": "jetgit.changelists.removeEmpty",
         "title": "Delete Empty Changelists",
         "category": "JetGit"
@@ -256,8 +267,13 @@
       ],
       "view/title": [
         {
+          "command": "jetgit.changelists.refresh",
+          "group": "navigation@1",
+          "when": "view == jetgitChangelists"
+        },
+        {
           "command": "jetgit.changelists.new",
-          "group": "navigation",
+          "group": "navigation@2",
           "when": "view == jetgitChangelists"
         },
         {
@@ -298,18 +314,28 @@
           "when": "view == jetgitChangelists && viewItem == changelist"
         },
         {
-          "command": "jetgit.changelists.moveFiles",
+          "command": "jetgit.changelists.commitFiles",
           "group": "1_jet@1",
           "when": "view == jetgitChangelists && viewItem == changelistFile"
         },
         {
-          "command": "jetgit.changes.openFile",
+          "command": "jetgit.changes.rollbackFile",
           "group": "1_jet@2",
           "when": "view == jetgitChangelists && viewItem == changelistFile"
         },
         {
-          "command": "jetgit.changes.rollbackFile",
-          "group": "2_jet@1",
+          "command": "jetgit.changelists.moveFiles",
+          "group": "1_jet@3",
+          "when": "view == jetgitChangelists && viewItem == changelistFile"
+        },
+        {
+          "command": "jetgit.changes.openDiff",
+          "group": "1_jet@4",
+          "when": "view == jetgitChangelists && viewItem == changelistFile"
+        },
+        {
+          "command": "jetgit.changes.openFile",
+          "group": "1_jet@5",
           "when": "view == jetgitChangelists && viewItem == changelistFile"
         },
         {
@@ -389,6 +415,10 @@
         },
         {
           "command": "jetgit.changelists.moveFiles",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.changelists.commitFiles",
           "when": "false"
         },
         {

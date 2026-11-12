@@ -4,6 +4,12 @@ All notable changes to JetGit are documented here.
 
 ## [0.1.0] — 2026-11-10 (in development)
 
+### Added (milestone 6.6 — commit selection & action menu)
+- **Commit checkboxes** in the Changelists view: every file carries a checkbox that decides whether it joins the next commit (IntelliJ parity) — new files start checked; the changelist checkbox checks/unchecks all its files. One VS Code limitation, compensated: the checkbox has no visual "partially checked" state, so it shows checked only when every file is included.
+- **Commit Changelist… commits the checked subset** (leaving the unchecked files in the working tree); **Commit Files…** on a multi-selection commits those files directly, overriding checkboxes — IntelliJ semantics.
+- **Refresh** button in the view title forces a status reconcile across repositories.
+- File context menu reordered to match the familiar flow: Commit Files…, Rollback File to HEAD, Move to Changelist…, Open Change Diff, Open File.
+
 ### Added (milestone 6.5 — commit review + partial rollback)
 - **Open Change Diff**: clicking a changelist file now opens a side-by-side diff of HEAD ↔ the live working file — the right pane is a real editor, so you review AND edit in the same tab (the plain file stays on the context menu under "Open File").
 - **Rollback Selected Lines to HEAD**: select lines in EITHER pane of the diff (editor title button or context menu) and revert only the hunks under the selection — the rest of the file keeps its local edits. One `WorkspaceEdit`, one modal confirm (`jetgit.changes.confirmRollback`), undoable with Ctrl+Z, buffer stays dirty per your autosave settings.

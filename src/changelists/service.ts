@@ -106,8 +106,10 @@ export class ChangelistsService {
   /**
    * Commits exactly the changelist's member files via `git commit --only`,
    * preserving the user's remaining index. Never passes --no-verify.
+   * `only` (the tree's checked subset) further restricts the members — an
+   * empty intersection surfaces the standard "no changes" info.
    */
-  async commitChangelist(id: string): Promise<void> {
+  async commitChangelist(id: string, only?: ReadonlySet<string>): Promise<void> {
     if (!this.state) {
       await this.ready();
     }
@@ -127,7 +129,10 @@ export class ChangelistsService {
       return;
     }
 
-    const members = model.membersWithChanges(this.state, id, this.currentStatusPaths());
+    let members = model.membersWithChanges(this.state, id, this.currentStatusPaths());
+    if (only) {
+      members = members.filter((m) => only.has(m));
+    }
     const clName = cl?.name ?? id;
     if (members.length === 0) {
       void vscode.window.showInformationMessage(Strings.changelists.commitNoChanges.replace('{name}', clName));

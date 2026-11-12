@@ -9,10 +9,13 @@ import { showError } from '../common/log';
 import type { GitApiService, RepoHandle } from '../git/gitApi';
 import { Strings } from '../strings';
 import * as model from './model';
+import { CommitSelection } from './selection';
 import { ChangelistsService } from './service';
+import type { ChangelistFileNode, ChangelistNode, JetGitChangelistsTreeNode } from './tree';
 
 export class ChangelistsController {
   private readonly services = new Map<string, ChangelistsService>();
+  private readonly selection = new CommitSelection();
   private readonly disposables = new DisposableCollection();
   private readonly reposListener: vscode.Disposable;
   private readonly changeEmitter = new vscode.EventEmitter<void>();
@@ -38,6 +41,52 @@ export class ChangelistsController {
     return out;
   }
 
+  /** Checkbox state source for the tree (file + changelist nodes). */
+  isChecked(repoKey: string, changelistId: string, relPath: string): boolean {
+    return this.selection.isChecked(repoKey, changelistId, relPath);
+  }
+
+  /**
+   * TreeView checkbox toggles. File rows flip one path; a changelist row
+   * applies to all its current members (the VS Code checkbox has no visual
+   * mixed state, so it reads checked only when EVERYTHING is checked —
+   * clicking a partially-checked changelist checks all).
+   */
+  handleCheckboxChange(event: vscode.TreeCheckboxChangeEvent<JetGitChangelistsTreeNode>): void {
+    let changed = false;
+    for (const [element, state] of event.items) {
+      const checked = state === vscode.TreeItemCheckboxState.Checked;
+      if ((element as ChangelistFileNode).kind === 'changelistFile') {
+        const node = element as ChangelistFileNode;
+        this.selection.setChecked(node.repoKey, node.changelistId, node.relPath, checked);
+        changed = true;
+      } else if ((element as ChangelistNode).kind === 'changelist') {
+        const node = element as ChangelistNode;
+        const files = this.serviceFor(node.repoKey)?.snapshot?.changelists.find((c) => c.id === node.changelistId)?.files ?? [];
+        if (checked) {
+          this.selection.checkAll(node.repoKey, node.changelistId);
+        } else {
+          this.selection.uncheckAll(node.repoKey, node.changelistId, files);
+        }
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.changeEmitter.fire();
+    }
+  }
+
+  /** Drops unchecked entries for paths/changelists that no longer exist. */
+  private pruneSelection(repoKey: string): void {
+    const state = this.serviceFor(repoKey)?.snapshot;
+    if (state) {
+      this.selection.pruneRepo(
+        repoKey,
+        state.changelists.map((c) => ({ id: c.id, files: c.files })),
+      );
+    }
+  }
+
   private async syncRepos(): Promise<void> {
     const liveKeys = new Set<string>();
     for (const repo of this.gitApi.repositories) {
@@ -50,7 +99,12 @@ export class ChangelistsController {
           await service.ready();
           await service.reconcile();
           this.services.set(key, service);
-          this.disposables.add(service.onDidChange(() => this.changeEmitter.fire()));
+          this.disposables.add(
+            service.onDidChange(() => {
+              this.pruneSelection(key);
+              this.changeEmitter.fire();
+            }),
+          );
           this.changeEmitter.fire();
         } catch (err) {
           showError(`JetGit: failed to attach to repository ${repo.rootUri.fsPath}`, err);
@@ -201,7 +255,41 @@ export class ChangelistsController {
       if (!isChangelistNode(node)) {
         return;
       }
-      await this.withService(node.repoKey, (service) => service.commitChangelist(node.changelistId));
+      // The checked subset drives the commit (IntelliJ parity). All checked →
+      // no restriction; nothing checked → the service's "no changes" info.
+      const files =
+        this.serviceFor(node.repoKey)?.snapshot?.changelists.find((c) => c.id === node.changelistId)?.files ?? [];
+      const checked = this.selection.checkedSubset(node.repoKey, node.changelistId, files);
+      const only = files.length > 0 && checked.length === files.length ? undefined : new Set(checked);
+      await this.withService(node.repoKey, (service) => service.commitChangelist(node.changelistId, only));
+    });
+
+    register('jetgit.changelists.commitFiles', async (node: unknown, nodes: unknown) => {
+      const fileNodes = [node, ...(Array.isArray(nodes) ? nodes : [])].filter(isFileNode);
+      const first = fileNodes[0];
+      if (!first) {
+        return;
+      }
+      // Explicit selection wins over checkboxes (IntelliJ "Commit Files…").
+      // Multi-select spanning changelists commits the first changelist's files.
+      const paths = [
+        ...new Set(
+          fileNodes.filter((f) => f.repoKey === first.repoKey && f.changelistId === first.changelistId).map((f) => f.relPath),
+        ),
+      ];
+      if (paths.length === 0) {
+        return;
+      }
+      await this.withService(first.repoKey, (service) => service.commitChangelist(first.changelistId, new Set(paths)));
+    });
+
+    register('jetgit.changelists.refresh', async () => {
+      // Force a status reconcile across repositories (RepoStatePoller keeps
+      // things live; this is the explicit IntelliJ-style Refresh).
+      for (const entry of this.entries()) {
+        await this.withService(entry.repo.rootUri.toString(), (service) => service.reconcile());
+      }
+      this.changeEmitter.fire();
     });
 
     register('jetgit.changelists.removeEmpty', async () => {

@@ -42,12 +42,17 @@ export function activate(context: vscode.ExtensionContext): void {
   // --- M2: Changelists (real implementation) ---
   const changelists = new ChangelistsController(gitApi);
   disposables.add(changelists);
-  const changelistsTree = new ChangelistsTreeProvider(() => changelists.entries(), changelists.onDidChangeServices);
+  const changelistsTree = new ChangelistsTreeProvider(
+    () => changelists.entries(),
+    changelists.onDidChangeServices,
+    (repoKey, changelistId, relPath) => changelists.isChecked(repoKey, changelistId, relPath),
+  );
   const changelistsTreeView = vscode.window.createTreeView('jetgitChangelists', {
     treeDataProvider: changelistsTree,
     dragAndDropController: new ChangelistsDragAndDrop(),
   });
   disposables.add(changelistsTreeView);
+  disposables.add(changelistsTreeView.onDidChangeCheckboxState((items) => changelists.handleCheckboxChange(items)));
   disposables.add(changelists.registerCommands());
 
   // --- M3: Shelves (real implementation) ---
