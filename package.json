@@ -219,12 +219,41 @@
         "icon": "clear-all"
       },
       {
+        "command": "jetgit.changes.openDiff",
+        "title": "Open Change Diff",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.changes.rollbackSelected",
+        "title": "Rollback Selected Lines to HEAD",
+        "category": "JetGit",
+        "icon": "discard"
+      },
+      {
+        "command": "jetgit.changes.rollbackFile",
+        "title": "Rollback File to HEAD",
+        "category": "JetGit",
+        "icon": "discard"
+      },
+      {
+        "command": "jetgit.changes.openFile",
+        "title": "Open File",
+        "category": "JetGit"
+      },
+      {
         "command": "jetgit.showLog",
         "title": "Show Log",
         "category": "JetGit"
       }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "jetgit.changes.rollbackSelected",
+          "group": "navigation@1",
+          "when": "gitOpenRepositoryCount != 0 && isInDiffEditor && isInDiffRightEditor && resourceScheme == file && !isEmbeddedDiffEditor"
+        }
+      ],
       "view/title": [
         {
           "command": "jetgit.changelists.new",
@@ -274,6 +303,16 @@
           "when": "view == jetgitChangelists && viewItem == changelistFile"
         },
         {
+          "command": "jetgit.changes.openFile",
+          "group": "1_jet@2",
+          "when": "view == jetgitChangelists && viewItem == changelistFile"
+        },
+        {
+          "command": "jetgit.changes.rollbackFile",
+          "group": "2_jet@1",
+          "when": "view == jetgitChangelists && viewItem == changelistFile"
+        },
+        {
           "command": "jetgit.shelf.shelve",
           "group": "4_jet@1",
           "when": "view == jetgitChangelists && viewItem == changelist"
@@ -310,6 +349,11 @@
         }
       ],
       "editor/context": [
+        {
+          "command": "jetgit.changes.rollbackSelected",
+          "group": "8_jetgit",
+          "when": "gitOpenRepositoryCount != 0 && isInDiffEditor && isInDiffRightEditor && resourceScheme == file && !isEmbeddedDiffEditor"
+        },
         {
           "submenu": "jetgit.localHistory",
           "group": "9_jetgit"
@@ -381,6 +425,10 @@
         },
         {
           "command": "jetgit.compare.clear",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.changes.openFile",
           "when": "false"
         }
       ]
@@ -463,6 +511,16 @@
           "type": "number",
           "default": 200,
           "description": "Maximum commits listed per direction in a comparison."
+        },
+        "jetgit.changes.confirmRollback": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask for confirmation before rolling back changes to HEAD."
+        },
+        "jetgit.changes.maxFileSizeKB": {
+          "type": "number",
+          "default": 2048,
+          "description": "Skip change review and rollback for files larger than this size."
         },
         "jetgit.log.level": {
           "type": "string",

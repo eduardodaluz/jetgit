@@ -146,8 +146,9 @@ export class ChangelistsTreeProvider implements vscode.TreeDataProvider<JetGitCh
     node.contextValue = 'changelistFile';
     node.description = path.posix.dirname(relPath) === '.' ? '' : path.posix.dirname(relPath);
     node.iconPath = vscode.ThemeIcon.File;
-    const uri = vscode.Uri.file(`${rootFsPath}/${relPath}`);
-    node.command = { command: 'vscode.open', title: 'Open File', arguments: [uri] };
+    // Opening a change shows the HEAD↔worktree diff (editable right pane) —
+    // the plain file stays reachable via the "Open File" context action.
+    node.command = { command: 'jetgit.changes.openDiff', title: 'Show Diff', arguments: [node] };
     return node;
   }
 }

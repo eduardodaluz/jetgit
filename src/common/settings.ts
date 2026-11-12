@@ -29,6 +29,10 @@ export interface JetGitSettings {
   compare: {
     maxCommitEntries: number;
   };
+  changes: {
+    confirmRollback: boolean;
+    maxFileSizeKB: number;
+  };
   log: {
     level: LogLevel;
   };
@@ -62,6 +66,10 @@ function read(): JetGitSettings {
     },
     compare: {
       maxCommitEntries: cfg.get<number>('compare.maxCommitEntries', 200),
+    },
+    changes: {
+      confirmRollback: cfg.get<boolean>('changes.confirmRollback', true),
+      maxFileSizeKB: cfg.get<number>('changes.maxFileSizeKB', 2048),
     },
     log: {
       level,

@@ -31,6 +31,7 @@ const testOptions = {
     { in: 'src/test/suite/localHistory.test.ts', out: 'test/suite/localHistory.test' },
     { in: 'src/test/suite/blame.test.ts', out: 'test/suite/blame.test' },
     { in: 'src/test/suite/compare.test.ts', out: 'test/suite/compare.test' },
+    { in: 'src/test/suite/rollback.test.ts', out: 'test/suite/rollback.test' },
   ],
   outdir: 'dist',
   // Each test file bundles its own imports (src/ modules live inside the

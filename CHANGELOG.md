@@ -4,6 +4,13 @@ All notable changes to JetGit are documented here.
 
 ## [0.1.0] — 2026-11-10 (in development)
 
+### Added (milestone 6.5 — commit review + partial rollback)
+- **Open Change Diff**: clicking a changelist file now opens a side-by-side diff of HEAD ↔ the live working file — the right pane is a real editor, so you review AND edit in the same tab (the plain file stays on the context menu under "Open File").
+- **Rollback Selected Lines to HEAD**: select lines in EITHER pane of the diff (editor title button or context menu) and revert only the hunks under the selection — the rest of the file keeps its local edits. One `WorkspaceEdit`, one modal confirm (`jetgit.changes.confirmRollback`), undoable with Ctrl+Z, buffer stays dirty per your autosave settings.
+- **Staged work is safe by design**: the rollback base is always HEAD, never the index; the index is never touched, so staged content survives any rollback operation (staged-vs-worktree deltas remain visible afterwards, as intended).
+- **Rollback File to HEAD**: whole-file rollback (worktree ← index version, IntelliJ parity) with a modal confirm; untracked files are deleted after an explicit confirm; locally deleted tracked files are restored; a dirty open editor is warned about and reloaded so a later save can't silently undo the rollback.
+- Precision guarantees, integration-tested: byte-exact round-trips including trailing-newline transitions in both directions, deletions restored via left-pane selection, CRLF files without `\r` doubling, repo-scoped isolation in multi-root workspaces; `jetgit.changes.maxFileSizeKB` (default 2048) and binary/non-UTF-8 guards keep the feature text-only.
+
 ### Added (milestone 6 — compare with ref)
 - **Compare with Branch, Tag or Ref…**: outgoing/incoming commit counts and lists against any ref, with IntelliJ-parity file classes carried by theme colors — green = only here, gray = only at the ref, blue = differs (counts are exact; commit lists cap at `jetgit.compare.maxCommitEntries` with a "+N more" entry).
 - **Compare view** in the JetGit container: Outgoing / Incoming / Changed-files sections; click a commit for its per-commit file diffs (via `jetgit-ref:`), click a file for a side-by-side diff against the compared ref.

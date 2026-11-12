@@ -3,8 +3,8 @@
  * feature logic lives in its own module tree.
  *
  * Milestones: M1 scaffold (log/settings/git bridge/placeholder views),
- * M2 changelists, M3 shelves, M4 local history, M5 inline blame, M6 compare.
- * M7 (polish + publish) remains.
+ * M2 changelists, M3 shelves, M4 local history, M5 inline blame, M6 compare,
+ * M6.5 commit review + partial rollback. M7 (polish + publish) remains.
  */
 import * as vscode from 'vscode';
 import { DisposableCollection } from './common/async';
@@ -21,6 +21,7 @@ import { BlameController } from './blame/controller';
 import { registerRefContentProvider } from './git/refContent';
 import { CompareService } from './compare/service';
 import { CompareTreeProvider } from './compare/tree';
+import { registerChangesCommands } from './changes/commands';
 
 export function activate(context: vscode.ExtensionContext): void {
   const disposables = new DisposableCollection();
@@ -76,6 +77,9 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   disposables.add(vscode.window.createTreeView('jetgitCompare', { treeDataProvider: compareTree }));
   disposables.add(compare.registerCommands());
+
+  // --- M6.5: Commit review + partial rollback ---
+  disposables.add(registerChangesCommands(gitApi));
   disposables.add(registerPlaceholderCommands());
 }
 

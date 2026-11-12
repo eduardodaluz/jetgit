@@ -10,6 +10,12 @@ import type { GitApiService } from './gitApi';
 
 export const REF_SCHEME = 'jetgit-ref';
 
+/**
+ * Sentinel ref for the review diff of a LOCALLY DELETED file: the provider
+ * serves empty content so vscode.diff renders a full-width deletion.
+ */
+export const EMPTY_REF = '__jetgit_empty__';
+
 interface RefUriPayload {
   /** RepoHandle identity: rootUri.toString() */
   repo: string;
@@ -50,6 +56,9 @@ export class RefContentProvider implements vscode.TextDocumentContentProvider {
     const payload = parseRefUri(uri);
     if (!payload) {
       return '<!-- JetGit: malformed ref reference -->';
+    }
+    if (payload.ref === EMPTY_REF) {
+      return '';
     }
     try {
       const stdout = await this.runReadOnlyInRepo(payload.repo, ['show', `${payload.ref}:${payload.relPath}`]);
