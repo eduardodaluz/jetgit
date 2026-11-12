@@ -3,16 +3,14 @@
  * feature logic lives in its own module tree.
  *
  * Milestones: M1 scaffold (log/settings/git bridge/placeholder views),
- * M2 changelists, M3 shelves, M4 local history, M5 inline blame.
- * Compare lands in M6 and keeps its placeholder until then.
+ * M2 changelists, M3 shelves, M4 local history, M5 inline blame, M6 compare.
+ * M7 (polish + publish) remains.
  */
 import * as vscode from 'vscode';
 import { DisposableCollection } from './common/async';
 import { initLog, setLogLevel } from './common/log';
 import { settings } from './common/settingsInstance';
-import { Strings } from './strings';
 import { GitApiService } from './git/gitApi';
-import { PlaceholderTreeProvider } from './placeholderTree';
 import { registerPlaceholderCommands } from './placeholderCommands';
 import { ChangelistsController } from './changelists/commands';
 import { ChangelistsDragAndDrop, ChangelistsTreeProvider } from './changelists/tree';
@@ -21,6 +19,8 @@ import { ShelfTreeProvider } from './shelf/tree';
 import { LocalHistoryController } from './localHistory/commands';
 import { BlameController } from './blame/controller';
 import { registerRefContentProvider } from './git/refContent';
+import { CompareService } from './compare/service';
+import { CompareTreeProvider } from './compare/tree';
 
 export function activate(context: vscode.ExtensionContext): void {
   const disposables = new DisposableCollection();
@@ -66,12 +66,16 @@ export function activate(context: vscode.ExtensionContext): void {
   disposables.add(blame.registerCommands());
   disposables.add(registerRefContentProvider(gitApi));
 
-  // --- M6 placeholder ---
-  disposables.add(
-    vscode.window.createTreeView('jetgitCompare', {
-      treeDataProvider: new PlaceholderTreeProvider(Strings.placeholders.compareMilestone, gitApi),
-    }),
+  // --- M6: Compare with ref (real implementation) ---
+  const compare = new CompareService(gitApi);
+  disposables.add(compare);
+  const compareTree = new CompareTreeProvider(
+    () => compare.current,
+    () => gitApi.repositories,
+    compare.onDidChange,
   );
+  disposables.add(vscode.window.createTreeView('jetgitCompare', { treeDataProvider: compareTree }));
+  disposables.add(compare.registerCommands());
   disposables.add(registerPlaceholderCommands());
 }
 

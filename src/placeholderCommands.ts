@@ -1,22 +1,18 @@
 /**
- * Placeholder command registry for features whose milestones have not landed.
- * Every command declared in package.json gets a real handler so menus never
- * dangle. Feature milestones REMOVE their entries here as they implement
- * them in their own module (M2 changelists already live in changelists/).
+ * Placeholder command registry for features whose milestones have not
+ * landed. Every command declared in package.json gets a real handler so
+ * menus never dangle. Feature milestones REMOVE their entries here as they
+ * implement them in their own module (M2–M6 commands all live in their
+ * feature trees now; this file only carries jetgit.showLog).
  */
 import * as vscode from 'vscode';
 import { DisposableCollection } from './common/async';
 import { showLog } from './common/log';
 import { Strings } from './strings';
 
-const MILESTONES: Record<string, { feature: string; milestone: string }> = {
-  // M5 blame commands now live in blame/commands.ts.
-  'jetgit.compare.withRef': { feature: 'Compare with Ref', milestone: 'milestone 6' },
-  'jetgit.compare.workingTree': { feature: 'Compare Working Tree', milestone: 'milestone 6' },
-  'jetgit.compare.getFileFromRef': { feature: 'Get from Branch', milestone: 'milestone 6' },
-  'jetgit.compare.openCommitFiles': { feature: 'Commit file diffs', milestone: 'milestone 6' },
-  'jetgit.compare.clear': { feature: 'Clear Comparison', milestone: 'milestone 6' },
-};
+const MILESTONES: Record<string, { feature: string; milestone: string }> = {};
+// No placeholders left — every package.json command is implemented (M7 may
+// delete this module once the final command set is reviewed).
 
 export function registerPlaceholderCommands(): vscode.Disposable {
   const disposables = new DisposableCollection();

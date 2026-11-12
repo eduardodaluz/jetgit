@@ -4,6 +4,7 @@
  * tests wrap a real sandbox repo through execFileSync. Pure logic, no vscode.
  */
 import { parseGitBlame, type BlameResult } from '../git/blameParser';
+import { parseNameStatus, type CommitFile } from '../git/nameStatus';
 
 export interface GitCliResult {
   readonly stdout: Buffer;
@@ -72,49 +73,19 @@ export async function commitInfo(adapter: BlameAdapter, sha: string): Promise<Co
   return { sha: shaField, author: author ?? '', timeSeconds: Number(time) || 0, summary: summary ?? '' };
 }
 
-export interface CommitFile {
-  /** Path as of the commit itself (rename target). */
-  path: string;
-  /** For renames/copies, the pre-image path. */
-  oldPath?: string;
-  status: 'A' | 'M' | 'D' | 'R' | 'C' | 'T';
-}
+export type { CommitFile };
 
 /**
  * Files touched by a commit. `-z` for NUL-safe parsing (tab/newline paths),
  * `--root` so the initial commit lists its files instead of empty output.
+ * Token parsing lives in git/nameStatus (shared with M6 compare).
  */
 export async function commitFiles(adapter: BlameAdapter, sha: string): Promise<CommitFile[]> {
   const out = check(
     await adapter.runReadOnly(['diff-tree', '--root', '-r', '-z', '--name-status', '--no-commit-id', '-M', sha]),
     ['diff-tree'],
   ).toString('utf8');
-  const files: CommitFile[] = [];
-  const tokens = out.split('\0');
-  let i = 0;
-  while (i < tokens.length) {
-    const statusToken = tokens[i];
-    if (statusToken === undefined || statusToken.length === 0) {
-      i += 1;
-      continue;
-    }
-    const letter = statusToken[0];
-    if (letter === 'R' || letter === 'C') {
-      const oldPath = tokens[i + 1];
-      const newPath = tokens[i + 2];
-      if (oldPath !== undefined && newPath !== undefined) {
-        files.push({ path: newPath, oldPath, status: letter });
-      }
-      i += 3;
-      continue;
-    }
-    const p = tokens[i + 1];
-    if (p !== undefined && (letter === 'A' || letter === 'M' || letter === 'D' || letter === 'T')) {
-      files.push({ path: p, status: letter });
-    }
-    i += 2;
-  }
-  return files;
+  return parseNameStatus(out);
 }
 
 /** `git show <ref>:<relPath>` — undefined when the ref/path pair doesn't resolve. */

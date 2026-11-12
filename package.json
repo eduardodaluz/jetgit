@@ -189,7 +189,8 @@
       {
         "command": "jetgit.compare.withRef",
         "title": "Compare with Branch, Tag or Ref…",
-        "category": "JetGit"
+        "category": "JetGit",
+        "icon": "git-compare"
       },
       {
         "command": "jetgit.compare.workingTree",
@@ -207,9 +208,15 @@
         "category": "JetGit"
       },
       {
+        "command": "jetgit.compare.openFileDiff",
+        "title": "Open File Diff",
+        "category": "JetGit"
+      },
+      {
         "command": "jetgit.compare.clear",
         "title": "Clear Comparison",
-        "category": "JetGit"
+        "category": "JetGit",
+        "icon": "clear-all"
       },
       {
         "command": "jetgit.showLog",
@@ -223,6 +230,16 @@
           "command": "jetgit.changelists.new",
           "group": "navigation",
           "when": "view == jetgitChangelists"
+        },
+        {
+          "command": "jetgit.compare.withRef",
+          "group": "navigation@1",
+          "when": "view == jetgitCompare"
+        },
+        {
+          "command": "jetgit.compare.clear",
+          "group": "navigation@2",
+          "when": "view == jetgitCompare && jetgitCompareActive"
         }
       ],
       "view/item/context": [
@@ -356,6 +373,10 @@
         },
         {
           "command": "jetgit.compare.openCommitFiles",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.compare.openFileDiff",
           "when": "false"
         },
         {

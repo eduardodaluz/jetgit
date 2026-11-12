@@ -4,6 +4,13 @@ All notable changes to JetGit are documented here.
 
 ## [0.1.0] — 2026-11-10 (in development)
 
+### Added (milestone 6 — compare with ref)
+- **Compare with Branch, Tag or Ref…**: outgoing/incoming commit counts and lists against any ref, with IntelliJ-parity file classes carried by theme colors — green = only here, gray = only at the ref, blue = differs (counts are exact; commit lists cap at `jetgit.compare.maxCommitEntries` with a "+N more" entry).
+- **Compare view** in the JetGit container: Outgoing / Incoming / Changed-files sections; click a commit for its per-commit file diffs (via `jetgit-ref:`), click a file for a side-by-side diff against the compared ref.
+- **Compare Working Tree with Ref…**: same matrix against uncommitted (tracked) state — deletions and local edits the committed compare cannot see.
+- **Get from Branch**: overwrite a file's working-tree content with its version from the compared ref (modal confirm; recreated for locally deleted files; not offered for renames or local-only files).
+- The active comparison recomputes itself (debounced, generation-token protected) on repository changes, so counts never go stale; Clear Comparison button appears while a comparison is active. Multi-root workspaces pick the repository when the active editor gives no answer.
+
 ### Added (milestone 5 — inline blame)
 - **Inline blame** with three modes (`jetgit.blame.mode`): off, current line (default), whole file — `git blame --porcelain` via the same git binary as the built-in extension, `-L` scoped per cursor line so huge files stay fast (5k lines ≈ 90 ms).
 - **Author coloring**: authors map deterministically to 8 line-highlight buckets per color-theme kind; high-contrast themes get text-only annotations (no backgrounds).
