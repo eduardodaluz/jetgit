@@ -464,7 +464,7 @@
     "bundle": "node esbuild.js --production",
     "build-tests": "node scripts/clean.mjs dist/test && node esbuild.js --test",
     "test:unit": "vitest run",
-    "test:integration": "node scripts/kill-stale-test-hosts.mjs && npm run build-tests && node ./dist/test/runTest.js",
+    "test:integration": "node scripts/kill-stale-test-hosts.mjs && npm run build-tests && node scripts/run-integration.mjs",
     "test": "npm run test:unit && npm run test:integration",
     "package": "vsce package"
   },
