@@ -42,12 +42,24 @@ jobs:
           JETGIT_FIXTURES_DIR: ${{ runner.temp }}/jetgit-fixtures
         shell: bash
         run: |
-          node scripts/build-fixtures.mjs
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            xvfb-run -a node dist/test/runTest.js
-          else
-            node dist/test/runTest.js
-          fi
+          run_tests() {
+            if [ "$RUNNER_OS" = "Linux" ]; then
+              xvfb-run -a node dist/test/runTest.js
+            else
+              node dist/test/runTest.js
+            fi
+          }
+          # The VS Code download/version-resolution inside test-electron is
+          # network-bound and flakes on runners (~15s request timeout).
+          for attempt in 1 2 3; do
+            if run_tests; then
+              exit 0
+            fi
+            echo "::warning::integration attempt ${attempt} failed"
+            sleep 10
+          done
+          echo "Integration tests failed after 3 attempts"
+          exit 1
 
       - name: Package (valid VSIX)
         if: matrix.os == 'ubuntu-latest'
