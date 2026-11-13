@@ -4,6 +4,13 @@ All notable changes to JetGit are documented here.
 
 ## [0.1.0] — 2026-11-10 (in development)
 
+### Added (milestone 6.8 — merge conflict experience)
+- **Merge-in-progress banner** in the Changelists view: a "Merge / Cherry-pick / Revert / Revert in progress" node with the live conflict count sits above your changelists while any git operation is running; with every conflict resolved it flips to "Conflicts resolved — ready to commit". When nothing is in progress the view is exactly as before.
+- **Accept Yours / Accept Theirs** per conflicted file (multi-select works): one click resolves a conflict the familiar way — the winning side is checked out into the working tree and STAGED, the losing side removed. Every unmerged code gets the right plan, including modify/delete conflicts (deleted-elsewhere files resolve by staging or by `git rm`, never by accident). During a rebase the file tooltip explains that the sides swap.
+- **Open Merge Editor** on a conflicted file routes to the native VS Code 3-way merge editor (per-conflict Accept Current/Incoming, rename-aware); "Open File" opens the raw conflicted content.
+- **Complete Merge…** commits the finished operation with a pre-filled message (git's own MERGE_MSG, cursor at the end), refuses politely while conflicts remain, and concludes rebases with `rebase --continue` (editor guard included so nothing hangs). **Abort** (merge / cherry-pick / revert / rebase) restores the repository to its pre-operation state after a modal confirm.
+- The probe is event-driven and read-only: operation markers are checked on the absolute git dir (worktree-safe) and the conflict set comes from one `git status --porcelain=v1 -z`, so conflicted paths never pollute changelists and resolving a file lands it in the staged changes (where it walks into the merge commit naturally).
+
 ### Added (milestone 6.7 — hunk-level commit inclusion)
 - **Commit checkboxes per change hunk in the diff editor**: the change review diff now shows a clickable "include/exclude in commit" lens on every changed hunk plus a "N differences, M included in commit" counter (VS Code has no interactive gutter checkboxes — CodeLens is the checkbox; a gutter mark keeps the state visible).
 - **Partial commits**: commit exactly the marked hunks of a file — one fix inside a big edit — built through a throwaway index (`GIT_INDEX_FILE` + read-tree/hash-object/commit) so the WORKTREE is never touched and the user's real index only syncs after success; pre-commit hooks run against exactly what is committed; failures are atomic. Whole-file-only commits keep the proven `--only` path.

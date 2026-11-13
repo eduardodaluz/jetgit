@@ -4,7 +4,8 @@
  *
  * Milestones: M1 scaffold (log/settings/git bridge/placeholder views),
  * M2 changelists, M3 shelves, M4 local history, M5 inline blame, M6 compare,
- * M6.5 commit review + partial rollback. M7 (polish + publish) remains.
+ * M6.5 commit review + partial rollback, M6.7 hunk-level commit inclusion,
+ * M6.8 merge conflict experience. M7 (polish + publish) remains.
  */
 import * as vscode from 'vscode';
 import { DisposableCollection } from './common/async';
@@ -14,6 +15,7 @@ import { GitApiService } from './git/gitApi';
 import { registerPlaceholderCommands } from './placeholderCommands';
 import { ChangelistsController } from './changelists/commands';
 import { ChangelistsDragAndDrop, ChangelistsTreeProvider } from './changelists/tree';
+import { MergeController } from './merge/commands';
 import { ShelfController } from './shelf/commands';
 import { ShelfTreeProvider } from './shelf/tree';
 import { LocalHistoryController } from './localHistory/commands';
@@ -47,11 +49,15 @@ export function activate(context: vscode.ExtensionContext): void {
   const review = new ChangesReviewController(gitApi);
   changelists.attachReview(review);
   review.attachTreeChecked((repoKey, relPath) => changelists.isTreeChecked(repoKey, relPath));
+  // --- M6.8: merge conflict experience (banner node + Accept Yours/Theirs) ---
+  const merge = new MergeController(gitApi);
+  disposables.add(merge);
   const changelistsTree = new ChangelistsTreeProvider(
     () => changelists.entries(),
     changelists.onDidChangeServices,
     (repoKey, changelistId, relPath) => changelists.isJoining(repoKey, changelistId, relPath),
     (repoKey, changelistId, relPath) => changelists.partialLabel(repoKey, changelistId, relPath),
+    () => merge.entries(),
   );
   const changelistsTreeView = vscode.window.createTreeView('jetgitChangelists', {
     treeDataProvider: changelistsTree,
@@ -62,6 +68,8 @@ export function activate(context: vscode.ExtensionContext): void {
   disposables.add(changelists.registerCommands());
   disposables.add(review.register());
   disposables.add(review.onDidChangeReview(() => changelistsTree.refresh()));
+  disposables.add(merge.registerCommands());
+  disposables.add(merge.onDidChangeServices(() => changelistsTree.refresh()));
 
   // --- M3: Shelves (real implementation) ---
   const shelves = new ShelfController(gitApi, { changelistEntries: () => changelists.entries() });

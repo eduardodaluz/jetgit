@@ -1,8 +1,9 @@
 /**
  * Changelists TreeView with drag-and-drop between changelists.
- * Layout: single repo → changelists at the top level; multi-root → one
- * repository node per repo, changelists beneath. The active changelist sorts
- * first and carries a distinct icon (IntelliJ-style emphasis).
+ * Layout: single repo → merge-in-progress node (M6.8) then changelists at
+ * the top level; multi-root → one repository node per repo, merge node +
+ * changelists beneath. The active changelist sorts first and carries a
+ * distinct icon (IntelliJ-style emphasis).
  */
 import * as path from 'node:path';
 import * as vscode from 'vscode';
@@ -10,6 +11,8 @@ import type { RepoHandle } from '../git/gitApi';
 import { Strings } from '../strings';
 import type { Changelist, ChangelistsState } from './model';
 import type { ChangelistsService } from './service';
+import type { MergeService } from '../merge/service';
+import type { ConflictEntry, MergeOperation, UnmergedCode } from '../merge/probe';
 
 export interface ChangelistNode extends vscode.TreeItem {
   kind: 'changelist';
@@ -35,7 +38,31 @@ export interface InfoNode extends vscode.TreeItem {
   kind: 'info';
 }
 
-export type JetGitChangelistsTreeNode = ChangelistNode | ChangelistFileNode | RepoNode | InfoNode;
+/** M6.8: merge/cherry-pick/revert/rebase-in-progress banner node (IntelliJ parity). */
+export interface MergeNode extends vscode.TreeItem {
+  kind: 'merge';
+  repoKey: string;
+  operation: MergeOperation;
+  /** True when every conflict is resolved — the node becomes the commit/continue entry point. */
+  allResolved: boolean;
+}
+
+/** M6.8: one unmerged path beneath a MergeNode. */
+export interface MergeConflictFileNode extends vscode.TreeItem {
+  kind: 'mergeConflictFile';
+  repoKey: string;
+  relPath: string;
+  code: UnmergedCode;
+  rootFsPath: string;
+}
+
+export type JetGitChangelistsTreeNode =
+  | ChangelistNode
+  | ChangelistFileNode
+  | RepoNode
+  | InfoNode
+  | MergeNode
+  | MergeConflictFileNode;
 
 export const MIME_JETGIT_CHANGELISTS = 'application/vnd.code.tree.jetgitchangelists';
 
@@ -48,6 +75,7 @@ export class ChangelistsTreeProvider implements vscode.TreeDataProvider<JetGitCh
     onDidChangeServices: vscode.Event<void>,
     private readonly isFileJoining: (repoKey: string, changelistId: string, relPath: string) => boolean,
     private readonly partialLabelOf: (repoKey: string, changelistId: string, relPath: string) => string | undefined,
+    private readonly mergeEntries: () => Array<{ repo: RepoHandle; merge: MergeService }> = () => [],
   ) {
     onDidChangeServices(() => this.changeEmitter.fire());
   }
@@ -73,7 +101,7 @@ export class ChangelistsTreeProvider implements vscode.TreeDataProvider<JetGitCh
     if (element === undefined) {
       const first = entries[0];
       if (entries.length === 1 && first) {
-        return this.getChangelistNodes(first.repo, first.service);
+        return [...this.getMergeNodes(first.repo), ...this.getChangelistNodes(first.repo, first.service)];
       }
       return entries.map(({ repo }): RepoNode => {
         const node = new vscode.TreeItem(path.basename(repo.rootUri.fsPath), vscode.TreeItemCollapsibleState.Expanded) as RepoNode;
@@ -90,7 +118,16 @@ export class ChangelistsTreeProvider implements vscode.TreeDataProvider<JetGitCh
       if (!entry) {
         return [];
       }
-      return this.getChangelistNodes(entry.repo, entry.service);
+      return [...this.getMergeNodes(entry.repo), ...this.getChangelistNodes(entry.repo, entry.service)];
+    }
+
+    if (element.kind === 'merge') {
+      const entry = this.mergeEntries().find((e) => e.repo.rootUri.toString() === element.repoKey);
+      const snapshot = entry?.merge.snapshot;
+      if (!entry || !snapshot) {
+        return [];
+      }
+      return this.mergeFileNodes(element.repoKey, entry.repo.rootUri.fsPath, snapshot.operation, snapshot.conflicts);
     }
 
     if (element.kind === 'changelist') {
@@ -142,6 +179,106 @@ export class ChangelistsTreeProvider implements vscode.TreeDataProvider<JetGitCh
       );
       return node;
     });
+  }
+
+  /** M6.8: the merge-in-progress node, ABOVE the changelists; none when clean. */
+  private getMergeNodes(repo: RepoHandle): MergeNode[] {
+    const repoKey = repo.rootUri.toString();
+    const mergeEntry = this.mergeEntries().find((e) => e.repo.rootUri.toString() === repoKey);
+    const snapshot = mergeEntry?.merge.snapshot;
+    if (!snapshot) {
+      return []; // no merge operation in progress — clean tree, no banner
+    }
+    const node = new vscode.TreeItem(
+      this.mergeLabelOf(snapshot.operation),
+      snapshot.conflicts.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+    ) as MergeNode;
+    node.kind = 'merge';
+    node.repoKey = repoKey;
+    node.operation = snapshot.operation;
+    node.allResolved = snapshot.conflicts.length === 0;
+    node.contextValue = 'merge';
+    node.iconPath = new vscode.ThemeIcon('git-merge');
+    node.description = node.allResolved
+      ? Strings.merge.resolvedReady
+      : Strings.merge.conflictsCount.replace('{count}', String(snapshot.conflicts.length));
+    node.tooltip = new vscode.MarkdownString(
+      `**${this.mergeLabelOf(snapshot.operation)}**\n\n${
+        node.allResolved
+          ? Strings.merge.resolvedReady
+          : Strings.merge.conflictsCount.replace('{count}', String(snapshot.conflicts.length))
+      }`,
+    );
+    return [node];
+  }
+
+  private mergeLabelOf(operation: MergeOperation): string {
+    switch (operation) {
+      case 'merge':
+        return Strings.merge.nodeMerge;
+      case 'cherry-pick':
+        return Strings.merge.nodeCherryPick;
+      case 'revert':
+        return Strings.merge.nodeRevert;
+      case 'rebase':
+        return Strings.merge.nodeRebase;
+      case 'unknown':
+        return Strings.merge.nodeUnknown;
+    }
+  }
+
+  private mergeFileNodes(
+    repoKey: string,
+    rootFsPath: string,
+    operation: MergeOperation,
+    conflicts: readonly ConflictEntry[],
+  ): MergeConflictFileNode[] {
+    return [...conflicts]
+      .sort((a, b) => a.path.localeCompare(b.path))
+      .map((conflict): MergeConflictFileNode => {
+        const node = new vscode.TreeItem(
+          path.posix.basename(conflict.path),
+          vscode.TreeItemCollapsibleState.None,
+        ) as MergeConflictFileNode;
+        node.kind = 'mergeConflictFile';
+        node.repoKey = repoKey;
+        node.relPath = conflict.path;
+        node.code = conflict.code;
+        node.rootFsPath = rootFsPath;
+        node.contextValue = 'mergeConflictFile';
+        const dirName = path.posix.dirname(conflict.path) === '.' ? '' : path.posix.dirname(conflict.path);
+        node.description = dirName;
+        node.iconPath = new vscode.ThemeIcon('file', new vscode.ThemeColor('gitDecoration.conflictingResourceForeground'));
+        // Clicking a conflict opens the native 3-way merge editor (Accept
+        // Current/Incoming per conflict) — the JetGit node just routes there.
+        node.command = { command: 'jetgit.merge.openMergeEditor', title: Strings.merge.openMergeEditorTitle, arguments: [node] };
+        const codeText = this.conflictCodeText(conflict.code);
+        node.tooltip = new vscode.MarkdownString(
+          `**${codeText}** (\`${conflict.code}\`)\n\n${conflict.path}${
+            operation === 'rebase' ? `\n\n${Strings.merge.sideNoteRebase}` : ''
+          }`,
+        );
+        return node;
+      });
+  }
+
+  private conflictCodeText(code: UnmergedCode): string {
+    switch (code) {
+      case 'UU':
+        return Strings.merge.tooltipUU;
+      case 'AA':
+        return Strings.merge.tooltipAA;
+      case 'DD':
+        return Strings.merge.tooltipDD;
+      case 'AU':
+        return Strings.merge.tooltipAU;
+      case 'UD':
+        return Strings.merge.tooltipUD;
+      case 'UA':
+        return Strings.merge.tooltipUA;
+      case 'DU':
+        return Strings.merge.tooltipDU;
+    }
   }
 
   private fileNode(repoKey: string, rootFsPath: string, changelistId: string, relPath: string): ChangelistFileNode {

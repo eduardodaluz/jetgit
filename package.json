@@ -257,6 +257,36 @@
         "category": "JetGit"
       },
       {
+        "command": "jetgit.merge.acceptYours",
+        "title": "Accept Yours",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.merge.acceptTheirs",
+        "title": "Accept Theirs",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.merge.openMergeEditor",
+        "title": "Open Merge Editor",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.merge.openFile",
+        "title": "Open File",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.merge.complete",
+        "title": "Complete Merge…",
+        "category": "JetGit"
+      },
+      {
+        "command": "jetgit.merge.abort",
+        "title": "Abort Merge",
+        "category": "JetGit"
+      },
+      {
         "command": "jetgit.showLog",
         "title": "Show Log",
         "category": "JetGit"
@@ -342,6 +372,36 @@
           "command": "jetgit.changes.openFile",
           "group": "1_jet@5",
           "when": "view == jetgitChangelists && viewItem == changelistFile"
+        },
+        {
+          "command": "jetgit.merge.acceptYours",
+          "group": "1_jet@1",
+          "when": "view == jetgitChangelists && viewItem == mergeConflictFile"
+        },
+        {
+          "command": "jetgit.merge.acceptTheirs",
+          "group": "1_jet@2",
+          "when": "view == jetgitChangelists && viewItem == mergeConflictFile"
+        },
+        {
+          "command": "jetgit.merge.openMergeEditor",
+          "group": "1_jet@3",
+          "when": "view == jetgitChangelists && viewItem == mergeConflictFile"
+        },
+        {
+          "command": "jetgit.merge.openFile",
+          "group": "1_jet@4",
+          "when": "view == jetgitChangelists && viewItem == mergeConflictFile"
+        },
+        {
+          "command": "jetgit.merge.complete",
+          "group": "1_jet@1",
+          "when": "view == jetgitChangelists && viewItem == merge"
+        },
+        {
+          "command": "jetgit.merge.abort",
+          "group": "1_jet@2",
+          "when": "view == jetgitChangelists && viewItem == merge"
         },
         {
           "command": "jetgit.shelf.shelve",
@@ -468,6 +528,30 @@
         },
         {
           "command": "jetgit.changes.toggleHunk",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.merge.acceptYours",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.merge.acceptTheirs",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.merge.openMergeEditor",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.merge.openFile",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.merge.complete",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.merge.abort",
           "when": "false"
         }
       ]

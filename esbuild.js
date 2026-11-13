@@ -33,6 +33,7 @@ const testOptions = {
     { in: 'src/test/suite/compare.test.ts', out: 'test/suite/compare.test' },
     { in: 'src/test/suite/rollback.test.ts', out: 'test/suite/rollback.test' },
     { in: 'src/test/suite/partialCommit.test.ts', out: 'test/suite/partialCommit.test' },
+    { in: 'src/test/suite/merge.test.ts', out: 'test/suite/merge.test' },
   ],
   outdir: 'dist',
   // Each test file bundles its own imports (src/ modules live inside the
