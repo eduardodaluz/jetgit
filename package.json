@@ -252,6 +252,11 @@
         "category": "JetGit"
       },
       {
+        "command": "jetgit.changes.toggleHunk",
+        "title": "Toggle Hunk Inclusion in Commit",
+        "category": "JetGit"
+      },
+      {
         "command": "jetgit.showLog",
         "title": "Show Log",
         "category": "JetGit"
@@ -459,6 +464,10 @@
         },
         {
           "command": "jetgit.changes.openFile",
+          "when": "false"
+        },
+        {
+          "command": "jetgit.changes.toggleHunk",
           "when": "false"
         }
       ]

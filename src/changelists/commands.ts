@@ -8,6 +8,7 @@ import { DisposableCollection } from '../common/async';
 import { showError } from '../common/log';
 import type { GitApiService, RepoHandle } from '../git/gitApi';
 import { Strings } from '../strings';
+import type { ChangesReviewController } from '../changes/review';
 import * as model from './model';
 import { CommitSelection } from './selection';
 import { ChangelistsService } from './service';
@@ -19,6 +20,7 @@ export class ChangelistsController {
   private readonly disposables = new DisposableCollection();
   private readonly reposListener: vscode.Disposable;
   private readonly changeEmitter = new vscode.EventEmitter<void>();
+  private review: ChangesReviewController | undefined;
 
   /** Fires whenever any per-repo service's changelist state changes. */
   readonly onDidChangeServices = this.changeEmitter.event;
@@ -41,6 +43,33 @@ export class ChangelistsController {
     return out;
   }
 
+  /** Injects the M6.7 review controller (hunk sessions + partial commits). */
+  attachReview(review: ChangesReviewController): void {
+    this.review = review;
+  }
+
+  /** Whole-file checkbox state — the review controller's seeding source. */
+  isTreeChecked(repoKey: string, relPath: string): boolean {
+    const state = this.serviceFor(repoKey)?.snapshot;
+    if (!state) {
+      return false;
+    }
+    const cl = model.findForPath(state, relPath);
+    return cl ? this.selection.isChecked(repoKey, cl.id, relPath) : false;
+  }
+
+  /** Tree rendering callbacks: joining = session-partial OR tree-checked. */
+  isJoining(repoKey: string, changelistId: string, relPath: string): boolean {
+    if (this.review?.isJoining(repoKey, relPath)) {
+      return true;
+    }
+    return this.selection.isChecked(repoKey, changelistId, relPath);
+  }
+
+  partialLabel(repoKey: string, changelistId: string, relPath: string): string | undefined {
+    return this.review?.partialLabel(repoKey, relPath);
+  }
+
   /** Checkbox state source for the tree (file + changelist nodes). */
   isChecked(repoKey: string, changelistId: string, relPath: string): boolean {
     return this.selection.isChecked(repoKey, changelistId, relPath);
@@ -58,15 +87,18 @@ export class ChangelistsController {
       const checked = state === vscode.TreeItemCheckboxState.Checked;
       if ((element as ChangelistFileNode).kind === 'changelistFile') {
         const node = element as ChangelistFileNode;
+        // The tree answers "whole file?": a click always folds the hunk session.
+        this.review?.clearSessions(node.repoKey, [node.relPath]);
         this.selection.setChecked(node.repoKey, node.changelistId, node.relPath, checked);
         changed = true;
       } else if ((element as ChangelistNode).kind === 'changelist') {
         const node = element as ChangelistNode;
         const files = this.serviceFor(node.repoKey)?.snapshot?.changelists.find((c) => c.id === node.changelistId)?.files ?? [];
+        this.review?.clearSessions(node.repoKey, files);
         if (checked) {
-          this.selection.checkAll(node.repoKey, node.changelistId);
+          this.selection.checkAll(node.repoKey, node.changelistId, files);
         } else {
-          this.selection.uncheckAll(node.repoKey, node.changelistId, files);
+          this.selection.uncheckAll(node.repoKey, node.changelistId);
         }
         changed = true;
       }
@@ -96,12 +128,16 @@ export class ChangelistsController {
         try {
           const gitDir = await this.gitApi.ensureGitDir(repo);
           const service = new ChangelistsService(repo, gitDir || '');
+          service.setPartialCommitRunner((repoHandle, members, partial, message) =>
+            this.review ? this.review.runPartialCommit(repoHandle, members, partial, message) : Promise.resolve(false),
+          );
           await service.ready();
           await service.reconcile();
           this.services.set(key, service);
           this.disposables.add(
             service.onDidChange(() => {
               this.pruneSelection(key);
+              this.review?.pruneRepo(key, new Set(service.currentStatusPaths()));
               this.changeEmitter.fire();
             }),
           );
@@ -255,13 +291,14 @@ export class ChangelistsController {
       if (!isChangelistNode(node)) {
         return;
       }
-      // The checked subset drives the commit (IntelliJ parity). All checked →
-      // no restriction; nothing checked → the service's "no changes" info.
+      // The joining subset drives the commit (IntelliJ parity): whole-checked
+      // files plus partial hunk sessions. Nothing joining → the service's
+      // "no changes" info.
       const files =
         this.serviceFor(node.repoKey)?.snapshot?.changelists.find((c) => c.id === node.changelistId)?.files ?? [];
-      const checked = this.selection.checkedSubset(node.repoKey, node.changelistId, files);
-      const only = files.length > 0 && checked.length === files.length ? undefined : new Set(checked);
-      await this.withService(node.repoKey, (service) => service.commitChangelist(node.changelistId, only));
+      const joining = files.filter((f) => this.isJoining(node.repoKey, node.changelistId, f));
+      const partial = this.review?.partialPlanFor(node.repoKey, joining) ?? new Map();
+      await this.withService(node.repoKey, (service) => service.commitChangelist(node.changelistId, new Set(joining), partial));
     });
 
     register('jetgit.changelists.commitFiles', async (node: unknown, nodes: unknown) => {
@@ -270,7 +307,8 @@ export class ChangelistsController {
       if (!first) {
         return;
       }
-      // Explicit selection wins over checkboxes (IntelliJ "Commit Files…").
+      // Explicit selection forces inclusion; files with review sessions still
+      // contribute their included hunks (single mental model, IntelliJ parity).
       // Multi-select spanning changelists commits the first changelist's files.
       const paths = [
         ...new Set(
@@ -280,7 +318,8 @@ export class ChangelistsController {
       if (paths.length === 0) {
         return;
       }
-      await this.withService(first.repoKey, (service) => service.commitChangelist(first.changelistId, new Set(paths)));
+      const partial = this.review?.partialPlanFor(first.repoKey, paths) ?? new Map();
+      await this.withService(first.repoKey, (service) => service.commitChangelist(first.changelistId, new Set(paths), partial));
     });
 
     register('jetgit.changelists.refresh', async () => {

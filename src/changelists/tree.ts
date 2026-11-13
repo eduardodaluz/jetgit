@@ -46,7 +46,8 @@ export class ChangelistsTreeProvider implements vscode.TreeDataProvider<JetGitCh
   constructor(
     private readonly reposProvider: () => Array<{ repo: RepoHandle; service: ChangelistsService }>,
     onDidChangeServices: vscode.Event<void>,
-    private readonly isFileChecked: (repoKey: string, changelistId: string, relPath: string) => boolean,
+    private readonly isFileJoining: (repoKey: string, changelistId: string, relPath: string) => boolean,
+    private readonly partialLabelOf: (repoKey: string, changelistId: string, relPath: string) => string | undefined,
   ) {
     onDidChangeServices(() => this.changeEmitter.fire());
   }
@@ -130,10 +131,10 @@ export class ChangelistsTreeProvider implements vscode.TreeDataProvider<JetGitCh
       node.contextValue = 'changelist';
       node.description = cl.comment ?? `${cl.files.length} file(s)`;
       node.iconPath = new vscode.ThemeIcon(isActive ? 'check-all' : 'list-unordered');
-      // No visual mixed state in the VS Code checkbox: Enabled means "every
-      // file joins the commit"; anything else renders unchecked (clicking it
-      // checks all — the safe direction for a destructive action).
-      node.checkboxState = cl.files.every((f) => this.isFileChecked(repo.rootUri.toString(), cl.id, f))
+      // No visual mixed state in the VS Code checkbox: checked means "every
+      // file joins the commit" (partial sessions count as joining); anything
+      // else renders unchecked — clicking it checks all (the safe direction).
+      node.checkboxState = cl.files.every((f) => this.isFileJoining(repo.rootUri.toString(), cl.id, f))
         ? vscode.TreeItemCheckboxState.Checked
         : vscode.TreeItemCheckboxState.Unchecked;
       node.tooltip = new vscode.MarkdownString(
@@ -151,10 +152,13 @@ export class ChangelistsTreeProvider implements vscode.TreeDataProvider<JetGitCh
     node.relPath = relPath;
     node.rootFsPath = rootFsPath;
     node.contextValue = 'changelistFile';
-    node.description = path.posix.dirname(relPath) === '.' ? '' : path.posix.dirname(relPath);
+    const partialLabel = this.partialLabelOf(repoKey, changelistId, relPath);
+    const dirName = path.posix.dirname(relPath) === '.' ? '' : path.posix.dirname(relPath);
+    node.description = partialLabel ? `${dirName ? dirName + ' · ' : ''}${partialLabel}` : dirName;
     node.iconPath = vscode.ThemeIcon.File;
-    // The per-file checkbox decides whether the file joins the next commit.
-    node.checkboxState = this.isFileChecked(repoKey, changelistId, relPath)
+    // The checkbox reflects the JOIN decision: whole-file check or a partial
+    // hunk session (the "i/n hunks" suffix explains the partial case).
+    node.checkboxState = this.isFileJoining(repoKey, changelistId, relPath)
       ? vscode.TreeItemCheckboxState.Checked
       : vscode.TreeItemCheckboxState.Unchecked;
     // Opening a change shows the HEAD↔worktree diff (editable right pane) —

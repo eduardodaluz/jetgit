@@ -26,6 +26,8 @@ const MIN_VERSION = { major: 2, minor: 31 }; // --pathspec-from-file shipped in 
 
 export interface GitCliOptions {
   readonly timeoutMs?: number;
+  /** Extra env for this invocation only (e.g. GIT_INDEX_FILE for temp-index commits). */
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 export interface GitCliResult {
@@ -126,7 +128,7 @@ export class GitCli {
         const child = spawn(this.gitPath(), args, {
           cwd,
           windowsHide: true,
-          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...opts?.env },
         });
         const stdout: Buffer[] = [];
         const stderr: Buffer[] = [];

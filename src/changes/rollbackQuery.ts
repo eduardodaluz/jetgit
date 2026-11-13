@@ -12,7 +12,11 @@
  *
  * Everything works in LF space: callers normalize both sides with toLf(),
  * and the command layer re-applies the document EOL when building TextEdits.
+ * M6.7 extends this module with the partial-commit content math (assemble
+ * INCLUDED content by reverting EXCLUDED hunks to HEAD) — hunk identity via
+ * content signatures from ./hunkSelection (both pure).
  */
+import { allSignatures } from './hunkSelection';
 
 export interface GitCliResult {
   readonly stdout: Buffer;
@@ -164,7 +168,6 @@ export function computeRollbackEdits(
   selections: readonly LineSelection[] | null,
   space: SelectionSpace,
 ): LineEdit[] {
-  const bufferLines = splitLfLines(bufferLf);
   const selected = hunks.filter((h) => {
     if (!selections) {
       return true;
@@ -184,12 +187,27 @@ export function computeRollbackEdits(
       return h.oldCount > 0 && overlaps(sel.first, sel.last, start, endExclusive);
     });
   });
+  return computeRollbackEditsForHunks(headLf, bufferLf, selected);
+}
+
+/**
+ * Core edit builder for an EXPLICIT hunk list. Selection must be by hunk
+ * identity — the partial-commit assembler passes the EXCLUDED hunks, and
+ * region-overlap selection cannot express that (adjacent hunks share
+ * footprint lines, so a complement selection would re-select included ones).
+ */
+export function computeRollbackEditsForHunks(
+  headLf: string,
+  bufferLf: string,
+  selectedHunks: readonly DiffHunk[],
+): LineEdit[] {
+  const bufferLines = splitLfLines(bufferLf);
 
   const edits: LineEdit[] = [];
   // Region text: the region spans whole lines (each contributes its newline),
   // so the replacement carries a trailing '\n' — EXCEPT the EOF edit, whose
   // text comes from the headLf slice below and carries the exact head ending.
-  for (const h of selected) {
+  for (const h of selectedHunks) {
     const replacement = h.oldLines.length > 0 ? h.oldLines.join('\n') + '\n' : '';
     if (h.newCount === 0) {
       // Restoring deleted lines: insert before 0-based line newStart
@@ -233,4 +251,69 @@ export function computeRollbackEdits(
     }
   }
   return edits;
+}
+
+/**
+ * Applies ascending, disjoint LineEdits to an LF string — the pure twin of
+ * the command layer's toTextEdits (same range semantics: document-end edits
+ * anchor at the true end; replaces span [start of line s, start of line e);
+ * insertions land before line startLine). Used by the partial-commit
+ * assembler to build "HEAD content for excluded hunks" content.
+ */
+export function applyLineEdits(lf: string, edits: readonly LineEdit[]): string {
+  const lines = splitLfLines(lf);
+  const starts: number[] = [];
+  let offset = 0;
+  for (const line of lines) {
+    starts.push(offset);
+    offset += line.length + 1;
+  }
+  const docEnd = lf.length;
+  let result = lf;
+  for (const edit of [...edits].reverse()) {
+    if (edit.touchesDocumentEnd) {
+      const start = edit.endLineExclusive > edit.startLine && edit.startLine < lines.length ? starts[edit.startLine]! : docEnd;
+      result = result.slice(0, start) + edit.text;
+    } else if (edit.endLineExclusive === edit.startLine) {
+      const at = edit.startLine < lines.length ? starts[edit.startLine]! : docEnd;
+      result = result.slice(0, at) + edit.text + result.slice(at);
+    } else {
+      const start = starts[edit.startLine]!;
+      const end = edit.endLineExclusive < lines.length ? starts[edit.endLineExclusive]! : docEnd;
+      result = result.slice(0, start) + edit.text + result.slice(end);
+    }
+  }
+  return result;
+}
+
+/**
+ * The partial-commit content math (M6.7): with the user's INCLUDED signatures,
+ * build the file content that keeps the EXCLUDED hunks at HEAD. Selecting by
+ * hunk IDENTITY is mandatory — the excluded list cannot be expressed as a
+ * region-selection complement (adjacent hunks share footprint lines).
+ * Returns undefined when nothing joins (no/stale signatures) or when the
+ * included hunks net out to HEAD (nothing to commit for this file).
+ */
+export function assembleIncludedLf(
+  headLf: string,
+  diskLf: string,
+  hunks: readonly DiffHunk[],
+  includedSigs: ReadonlySet<string>,
+): { contentLf: string | undefined; matched: number; total: number } {
+  const sigs = allSignatures(hunks);
+  const matched = sigs.filter((sig) => includedSigs.has(sig)).length;
+  if (matched === 0) {
+    return { contentLf: undefined, matched: 0, total: sigs.length };
+  }
+  const excluded = hunks.filter((_, index) => !includedSigs.has(sigs[index] ?? ''));
+  const edits = computeRollbackEditsForHunks(headLf, diskLf, excluded);
+  const contentLf = applyLineEdits(diskLf, edits);
+  return contentLf === headLf ? { contentLf: undefined, matched, total: sigs.length } : { contentLf, matched, total: sigs.length };
+}
+
+/** Re-applies the on-disk EOL convention to assembled LF content; the
+ * `hash-object --path` clean filter does any git-side conversion after that. */
+export function restoreEol(lf: string, diskBytes: Buffer): Buffer {
+  const eolCrlf = diskBytes.toString('utf8').includes('\r\n');
+  return Buffer.from(eolCrlf ? lf.replace(/\n/g, '\r\n') : lf, 'utf8');
 }

@@ -141,6 +141,12 @@ export const Strings = {
     rolledBackFileInfo: '"{path}" rolled back.',
     deletedInfo: '"{path}" deleted.',
     rollbackFailed: 'Rollback failed',
+    hunkLensIncluded: '✓ Included in commit — click to exclude',
+    hunkLensExcluded: 'Not included — click to include',
+    hunkLensCounter: '{total} difference(s), {included} included in commit',
+    partialFileSuffix: '{included}/{total} hunks',
+    staleHunksInfo: 'Some marked changes in {paths} were edited after review and were not committed.',
+    stagedConsumedInfo: 'Staged changes on {paths} joined this commit and no longer appear staged.',
   },
 
   errors: {

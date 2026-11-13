@@ -12,7 +12,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import * as vscode from 'vscode';
-import { diffWorktreeVsHead, toTextEdits } from '../../changes/commands';
+import { diffWorktreeVsHead } from '../../changes/partialCommit';
+import { toTextEdits } from '../../changes/commands';
 import { computeRollbackEdits, toLf, type LineEdit, type LineSelection, type RollbackAdapter } from '../../changes/rollbackQuery';
 
 function git(cwd: string, ...args: string[]): string {

@@ -20,7 +20,16 @@ import { TempTextFile, pathspecArgs, withPathspecFiles } from '../git/gitCli';
 import type { RepoHandle } from '../git/gitApi';
 import { Strings } from '../strings';
 import * as model from './model';
+import type { PartialPlan } from '../changes/partialCommit';
 import { ChangelistsStore } from './store';
+
+/** Runs the M6.7 temp-index partial commit; wired by the changelists controller. */
+export type PartialCommitRunner = (
+  repo: RepoHandle,
+  members: readonly string[],
+  partial: PartialPlan,
+  message: string,
+) => Promise<boolean>;
 
 export class ChangelistsService {
   private state: model.ChangelistsState | undefined;
@@ -29,6 +38,7 @@ export class ChangelistsService {
   private readonly reconcileDebounced: ((...args: []) => void) & { cancel(): void };
   private readonly changeEmitter = new vscode.EventEmitter<void>();
   private commitInProgress = false;
+  private partialRunner: PartialCommitRunner | undefined;
 
   readonly onDidChange = this.changeEmitter.event;
 
@@ -52,6 +62,11 @@ export class ChangelistsService {
 
   get snapshot(): model.ChangelistsState | undefined {
     return this.state;
+  }
+
+  /** Injects the review feature's temp-index commit runner (M6.7 wiring). */
+  setPartialCommitRunner(runner: PartialCommitRunner | undefined): void {
+    this.partialRunner = runner;
   }
 
   /** All repo-relative paths currently present in git status. */
@@ -104,12 +119,12 @@ export class ChangelistsService {
   }
 
   /**
-   * Commits exactly the changelist's member files via `git commit --only`,
-   * preserving the user's remaining index. Never passes --no-verify.
-   * `only` (the tree's checked subset) further restricts the members — an
-   * empty intersection surfaces the standard "no changes" info.
+   * Commits the changelist's members via `git commit --only`, preserving the
+   * user's remaining index. Never passes --no-verify. `only` (the joining
+   * subset) restricts the members; `partial` (hunk signatures per file)
+   * routes the WHOLE commit through the M6.7 temp-index machinery instead.
    */
-  async commitChangelist(id: string, only?: ReadonlySet<string>): Promise<void> {
+  async commitChangelist(id: string, only?: ReadonlySet<string>, partial?: PartialPlan): Promise<void> {
     if (!this.state) {
       await this.ready();
     }
@@ -148,6 +163,30 @@ export class ChangelistsService {
       ignoreFocusOut: true,
     });
     if (message === undefined || message.trim().length === 0) {
+      return;
+    }
+
+    // M6.7 routing: any partial member switches to the temp-index commit —
+    // the worktree and the real index are untouched until after success, so
+    // the M2 untracked add/rollback dance is unnecessary on this path.
+    if (partial && partial.size > 0 && this.partialRunner) {
+      this.commitInProgress = true;
+      try {
+        const committed = await this.partialRunner(this.repo, members, partial, message);
+        if (!committed) {
+          void vscode.window.showInformationMessage(Strings.changelists.commitNoChanges.replace('{name}', clName));
+          return;
+        }
+        void vscode.window.showInformationMessage(
+          Strings.changelists.committedSummary.replace('{count}', members.length.toString()).replace('{name}', clName),
+        );
+      } catch (err) {
+        await this.handleCommitError(err, clName, members);
+        return;
+      } finally {
+        this.commitInProgress = false;
+        await this.reconcile();
+      }
       return;
     }
 

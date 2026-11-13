@@ -19,21 +19,13 @@ import { looksBinary } from '../common/fsutil';
 import { showError } from '../common/log';
 import { settings } from '../common/settingsInstance';
 import type { GitApiService, RepoHandle } from '../git/gitApi';
-import { TempBufferFile } from '../git/gitCli';
 import { refContent } from '../blame/blameQuery';
 import { EMPTY_REF, REF_SCHEME, parseRefUri, refUri } from '../git/refContent';
 import { literalPathspec } from '../shelf/patchBuilder';
 import { Strings } from '../strings';
-import {
-  computeRollbackEdits,
-  parseHunks,
-  toLf,
-  type DiffHunk,
-  type LineEdit,
-  type LineSelection,
-  type RollbackAdapter,
-  type SelectionSpace,
-} from './rollbackQuery';
+import type { ChangesReviewController } from './review';
+import { diffWorktreeVsHead } from './partialCommit';
+import { computeRollbackEdits, toLf, type LineEdit, type LineSelection, type RollbackAdapter, type SelectionSpace } from './rollbackQuery';
 
 const BINARY_SNIFF_BYTES = 8192;
 
@@ -42,31 +34,6 @@ function adapterFor(repo: RepoHandle): RollbackAdapter {
     cwd: () => repo.rootUri.fsPath,
     runReadOnly: async (args) => repo.cli.runReadOnly(repo.rootUri.fsPath, args),
   };
-}
-
-const fwd = (p: string): string => p.replace(/\\/g, '/');
-
-/**
- * HEAD bytes vs normalized buffer text → -U0 hunks. Exit 1 means "files
- * differ" — that is success here (same contract as shelf patches).
- */
-export async function diffWorktreeVsHead(adapter: RollbackAdapter, headBytes: Buffer, bufferText: string): Promise<DiffHunk[]> {
-  const a = await TempBufferFile.create(Buffer.from(toLf(headBytes.toString('utf8')), 'utf8'));
-  const b = await TempBufferFile.create(Buffer.from(toLf(bufferText), 'utf8'));
-  try {
-    const result = await adapter.runReadOnly(['diff', '--no-index', '--no-color', '-U0', '--', fwd(a.path), fwd(b.path)]);
-    if (result.code === 0) {
-      return [];
-    }
-    if (result.code === 1) {
-      return parseHunks(result.stdout.toString('utf8'));
-    }
-    const firstLine = result.stderr.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)[0] ?? `exit code ${result.code}`;
-    throw new Error(`git diff --no-index failed: ${firstLine}`);
-  } finally {
-    await a.dispose();
-    await b.dispose();
-  }
 }
 
 /**
@@ -119,7 +86,7 @@ function normalizeSelection(selection: vscode.Selection): LineSelection {
   return { first, last: selection.end.character === 0 && last > first ? last - 1 : last };
 }
 
-export function registerChangesCommands(gitApi: GitApiService): vscode.Disposable {
+export function registerChangesCommands(gitApi: GitApiService, review?: ChangesReviewController): vscode.Disposable {
   const disposables = new DisposableCollection();
   const register = (command: string, handler: (...args: unknown[]) => unknown): void => {
     disposables.add(vscode.commands.registerCommand(command, handler));
@@ -180,6 +147,11 @@ export function registerChangesCommands(gitApi: GitApiService): vscode.Disposabl
       }
       const left = refUri(repo.rootUri, 'HEAD', relPath);
       const right = deleted ? refUri(repo.rootUri, EMPTY_REF, relPath) : fileUri;
+      // M6.7: opening the review diff (re)opens the hunk session from disk —
+      // the diff's checkboxes drive the partial commit.
+      if (review && !deleted) {
+        await review.openSessionFor(repo, relPath, fileUri);
+      }
       await vscode.commands.executeCommand(
         'vscode.diff',
         left,

@@ -21,6 +21,7 @@ import { BlameController } from './blame/controller';
 import { registerRefContentProvider } from './git/refContent';
 import { CompareService } from './compare/service';
 import { CompareTreeProvider } from './compare/tree';
+import { ChangesReviewController } from './changes/review';
 import { registerChangesCommands } from './changes/commands';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -42,10 +43,15 @@ export function activate(context: vscode.ExtensionContext): void {
   // --- M2: Changelists (real implementation) ---
   const changelists = new ChangelistsController(gitApi);
   disposables.add(changelists);
+  // --- M6.7: commit review controller (hunk sessions + partial commits) ---
+  const review = new ChangesReviewController(gitApi);
+  changelists.attachReview(review);
+  review.attachTreeChecked((repoKey, relPath) => changelists.isTreeChecked(repoKey, relPath));
   const changelistsTree = new ChangelistsTreeProvider(
     () => changelists.entries(),
     changelists.onDidChangeServices,
-    (repoKey, changelistId, relPath) => changelists.isChecked(repoKey, changelistId, relPath),
+    (repoKey, changelistId, relPath) => changelists.isJoining(repoKey, changelistId, relPath),
+    (repoKey, changelistId, relPath) => changelists.partialLabel(repoKey, changelistId, relPath),
   );
   const changelistsTreeView = vscode.window.createTreeView('jetgitChangelists', {
     treeDataProvider: changelistsTree,
@@ -54,6 +60,8 @@ export function activate(context: vscode.ExtensionContext): void {
   disposables.add(changelistsTreeView);
   disposables.add(changelistsTreeView.onDidChangeCheckboxState((items) => changelists.handleCheckboxChange(items)));
   disposables.add(changelists.registerCommands());
+  disposables.add(review.register());
+  disposables.add(review.onDidChangeReview(() => changelistsTree.refresh()));
 
   // --- M3: Shelves (real implementation) ---
   const shelves = new ShelfController(gitApi, { changelistEntries: () => changelists.entries() });
@@ -84,7 +92,7 @@ export function activate(context: vscode.ExtensionContext): void {
   disposables.add(compare.registerCommands());
 
   // --- M6.5: Commit review + partial rollback ---
-  disposables.add(registerChangesCommands(gitApi));
+  disposables.add(registerChangesCommands(gitApi, review));
   disposables.add(registerPlaceholderCommands());
 }
 

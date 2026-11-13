@@ -5,7 +5,16 @@
  * prefix-slice rule, stale-hunk drops). Pure module — no vscode.
  */
 import { describe, expect, it } from 'vitest';
-import { computeRollbackEdits, parseHunks, splitLfLines, toLf, type LineSelection } from './rollbackQuery';
+import { allSignatures } from './hunkSelection';
+import {
+  applyLineEdits,
+  assembleIncludedLf,
+  computeRollbackEdits,
+  parseHunks,
+  splitLfLines,
+  toLf,
+  type LineSelection,
+} from './rollbackQuery';
 
 describe('toLf / splitLfLines', () => {
   it('normalizes CRLF and never lone CR', () => {
@@ -249,5 +258,91 @@ describe('computeRollbackEdits — assembled round-trips', () => {
 
   it('empty-file head restores to empty', () => {
     expect(rollback('', 'x', '@@ -0,0 +1 @@\n+x\n')).toBe('');
+  });
+});
+
+describe('M6.7 — assembly by hunk identity (partial commit content)', () => {
+  it('git COALESCES adjacent changes into one hunk — the granularity contract (real output shape)', () => {
+    // Verified empirically against `git diff --no-index -U0` (git 2.56):
+    // "l2→L2" and "delete l3" emit a SINGLE hunk, not two adjacent ones.
+    const headLf = 'l1\nl2\nl3\nl4\n';
+    const diskLf = 'l1\nL2\nl4\n';
+    const hunks = parseHunks('@@ -2,2 +2 @@\n-l2\n-l3\n+L2\n');
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0]).toMatchObject({ oldStart: 2, oldCount: 2, newStart: 2, newCount: 1, oldLines: ['l2', 'l3'], newLines: ['L2'] });
+
+    const sigs = allSignatures(hunks);
+    const whole = assembleIncludedLf(headLf, diskLf, hunks, new Set(sigs));
+    expect(whole.contentLf).toBe(diskLf); // the whole change unit or nothing — hunk granularity
+  });
+
+  it('identity assembly: separated hunks commit independently, worktree-shape untouched', () => {
+    // l2→L2 coalesced with l3's deletion (real shape) + a separate l5→L5.
+    const headLf = 'l1\nl2\nl3\nl4\nl5\nl6\n';
+    const diskLf = 'l1\nL2\nl4\nL5\nl6\n';
+    const hunks = parseHunks('@@ -2,2 +2 @@\n-l2\n-l3\n+L2\n@@ -5 +4 @@\n-l5\n+L5\n');
+    const sigs = allSignatures(hunks);
+    expect(sigs).toHaveLength(2);
+
+    // Commit ONLY the l5 change: the excluded first hunk reverts to HEAD.
+    const { contentLf } = assembleIncludedLf(headLf, diskLf, hunks, new Set([sigs[1]!]));
+    expect(contentLf).toBe('l1\nl2\nl3\nl4\nL5\nl6\n');
+
+    // And only the first hunk → the second stays local.
+    const firstOnly = assembleIncludedLf(headLf, diskLf, hunks, new Set([sigs[0]!]));
+    expect(firstOnly.contentLf).toBe('l1\nL2\nl4\nl5\nl6\n');
+  });
+
+  it('real deletion header (-N +G,0): excluded deletion re-inserts at newStart', () => {
+    // Verified empirically: HEAD a,b,c,d → disk a,c,d emits "@@ -2 +1,0 @@".
+    // Include the distant d→D change; EXCLUDE the deletion → 'b' is restored
+    // in the committed content while the worktree keeps it deleted.
+    const headLf = 'a\nb\nc\nd\n';
+    const diskLf = 'a\nc\nD\n';
+    const hunks = parseHunks('@@ -2 +1,0 @@\n-b\n@@ -4 +3 @@\n-d\n+D\n');
+    const sigs = allSignatures(hunks);
+    const { contentLf } = assembleIncludedLf(headLf, diskLf, hunks, new Set([sigs[1]!]));
+    expect(contentLf).toBe('a\nb\nc\nD\n');
+  });
+
+  it('real insertion header (-N,0 +M): excluded insertion removes exactly the added lines', () => {
+    // Verified empirically: a,b,[X],c emits "@@ -2,0 +3 @@".
+    const headLf = 'a\nb\nc\n';
+    const diskLf = 'a\nb\nX\nC\n';
+    const hunks = parseHunks('@@ -2,0 +3 @@\n+X\n@@ -3 +4 @@\n-c\n+C\n');
+    const sigs = allSignatures(hunks);
+    const { contentLf } = assembleIncludedLf(headLf, diskLf, hunks, new Set([sigs[1]!]));
+    expect(contentLf).toBe('a\nb\nC\n');
+  });
+
+  it('all-included and nothing-included boundaries', () => {
+    const headLf = 'a\nb\n';
+    const diskLf = 'a\nB\n';
+    const hunks = parseHunks('@@ -2 +2 @@\n-b\n+B\n');
+    const sigs = allSignatures(hunks);
+    expect(assembleIncludedLf(headLf, diskLf, hunks, new Set(sigs)).contentLf).toBe(diskLf);
+    const none = assembleIncludedLf(headLf, diskLf, hunks, new Set());
+    expect(none.matched).toBe(0);
+    expect(none.total).toBe(1);
+  });
+
+  it('EOF hunk: including keeps the addition; excluding nets to HEAD (undefined)', () => {
+    const headLf = 'a\nb\n';
+    const diskLf = 'a\nb\nadd\n';
+    const hunks = parseHunks('@@ -2,0 +3 @@\n+add\n');
+    const sigs = allSignatures(hunks);
+    const whole = assembleIncludedLf(headLf, diskLf, hunks, new Set(sigs));
+    expect(whole.contentLf).toBe(diskLf);
+    // Excluding the addition restores HEAD exactly → the file has nothing to commit.
+    const nothing = assembleIncludedLf(headLf, diskLf, hunks, new Set());
+    expect(nothing.contentLf).toBeUndefined();
+  });
+
+  it('applyLineEdits mirrors the command-layer range semantics', () => {
+    const edits = [
+      { startLine: 1, endLineExclusive: 2, text: 'X\n', touchesDocumentEnd: false },
+      { startLine: 3, endLineExclusive: 4, text: '', touchesDocumentEnd: false },
+    ];
+    expect(applyLineEdits('a\nb\nc\nd\n', edits)).toBe('a\nX\nc\n');
   });
 });

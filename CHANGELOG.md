@@ -4,6 +4,12 @@ All notable changes to JetGit are documented here.
 
 ## [0.1.0] — 2026-11-10 (in development)
 
+### Added (milestone 6.7 — hunk-level commit inclusion)
+- **Commit checkboxes per change hunk in the diff editor**: the change review diff now shows a clickable "include/exclude in commit" lens on every changed hunk plus a "N differences, M included in commit" counter (VS Code has no interactive gutter checkboxes — CodeLens is the checkbox; a gutter mark keeps the state visible).
+- **Partial commits**: commit exactly the marked hunks of a file — one fix inside a big edit — built through a throwaway index (`GIT_INDEX_FILE` + read-tree/hash-object/commit) so the WORKTREE is never touched and the user's real index only syncs after success; pre-commit hooks run against exactly what is committed; failures are atomic. Whole-file-only commits keep the proven `--only` path.
+- **Files now start UNCHECKED** in the Changelists view (IntelliJ parity): you mark what joins. A file with included hunks shows "i/n hunks" in its description and joins the commit with just those lines; partial state survives closing the diff and line shifts above a hunk (content signatures, not line numbers).
+- Inclusion state is pruned on reconcile, folded back to plain checked/unchecked when it reaches all/none, and cleared on commit. Staged deltas consumed by a partial commit are reported, never silent. `jetgit.changes.maxFileSizeKB` and binary guards apply.
+
 ### Added (milestone 6.6 — commit selection & action menu)
 - **Commit checkboxes** in the Changelists view: every file carries a checkbox that decides whether it joins the next commit (IntelliJ parity) — new files start checked; the changelist checkbox checks/unchecks all its files. One VS Code limitation, compensated: the checkbox has no visual "partially checked" state, so it shows checked only when every file is included.
 - **Commit Changelist… commits the checked subset** (leaving the unchecked files in the working tree); **Commit Files…** on a multi-selection commits those files directly, overriding checkboxes — IntelliJ semantics.

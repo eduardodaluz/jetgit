@@ -1,9 +1,10 @@
 /**
  * In-memory commit selection for the changelists tree (IntelliJ parity):
  * each file's checkbox decides whether it joins the next commit of its
- * changelist. Absent from the unchecked set = checked, so files that arrive
- * via auto-assign start CHECKED (IntelliJ behavior) and the default state is
- * everything checked. Ephemeral by design — a session intent, not metadata.
+ * changelist. Present in the checked set = checked, so the default state is
+ * EVERYTHING UNCHECKED (the user marks what joins, per IntelliJ's commit
+ * list). Files arriving via auto-assign start unchecked too. Ephemeral by
+ * design — a session intent, not metadata.
  *
  * Pure module, no vscode import (vitest rule).
  */
@@ -11,35 +12,36 @@
 const key = (repoKey: string, changelistId: string): string => `${repoKey}\0${changelistId}`;
 
 export class CommitSelection {
-  private readonly unchecked = new Map<string, Set<string>>();
+  private readonly checked = new Map<string, Set<string>>();
 
   isChecked(repoKey: string, changelistId: string, relPath: string): boolean {
-    return !this.unchecked.get(key(repoKey, changelistId))?.has(relPath);
+    return this.checked.get(key(repoKey, changelistId))?.has(relPath) ?? false;
   }
 
   setChecked(repoKey: string, changelistId: string, relPath: string, checked: boolean): void {
     const k = key(repoKey, changelistId);
     if (checked) {
-      this.unchecked.get(k)?.delete(relPath);
+      let set = this.checked.get(k);
+      if (!set) {
+        set = new Set<string>();
+        this.checked.set(k, set);
+      }
+      set.add(relPath);
       return;
     }
-    let set = this.unchecked.get(k);
-    if (!set) {
-      set = new Set<string>();
-      this.unchecked.set(k, set);
-    }
-    set.add(relPath);
+    this.checked.get(k)?.delete(relPath);
   }
 
-  checkAll(repoKey: string, changelistId: string): void {
-    this.unchecked.delete(key(repoKey, changelistId));
+  checkAll(repoKey: string, changelistId: string, files: readonly string[]): void {
+    if (files.length === 0) {
+      this.checked.delete(key(repoKey, changelistId));
+      return;
+    }
+    this.checked.set(key(repoKey, changelistId), new Set(files));
   }
 
-  uncheckAll(repoKey: string, changelistId: string, files: readonly string[]): void {
-    this.checkAll(repoKey, changelistId);
-    if (files.length > 0) {
-      this.unchecked.set(key(repoKey, changelistId), new Set(files));
-    }
+  uncheckAll(repoKey: string, changelistId: string): void {
+    this.checked.delete(key(repoKey, changelistId));
   }
 
   /** The members that would join a commit right now. */
@@ -48,19 +50,19 @@ export class CommitSelection {
   }
 
   /**
-   * Reconcile-time hygiene: unchecked entries for paths that left the
+   * Reconcile-time hygiene: checked entries for paths that left the
    * changelist (or changelists that no longer exist) are dropped so state
    * never goes stale. Pass the CURRENT changelist inventory of the repo.
    */
   pruneRepo(repoKey: string, changelists: ReadonlyArray<{ id: string; files: readonly string[] }>): void {
     const live = new Set(changelists.map((c) => key(repoKey, c.id)));
-    for (const k of [...this.unchecked.keys()]) {
+    for (const k of [...this.checked.keys()]) {
       if (k.startsWith(`${repoKey}\0`) && !live.has(k)) {
-        this.unchecked.delete(k);
+        this.checked.delete(k);
       }
     }
     for (const cl of changelists) {
-      const set = this.unchecked.get(key(repoKey, cl.id));
+      const set = this.checked.get(key(repoKey, cl.id));
       if (set) {
         const memberKeys = new Set(cl.files);
         for (const relPath of [...set]) {
@@ -69,7 +71,7 @@ export class CommitSelection {
           }
         }
         if (set.size === 0) {
-          this.unchecked.delete(key(repoKey, cl.id));
+          this.checked.delete(key(repoKey, cl.id));
         }
       }
     }
