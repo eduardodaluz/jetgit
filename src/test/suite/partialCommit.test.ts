@@ -12,7 +12,7 @@ import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import * as vscode from 'vscode';
 import { GitCli } from '../../git/gitCli';
-import { allSignatures } from '../../changes/hunkSelection';
+import { allUnitSignatures, computeChangeUnits } from '../../changes/rollbackQuery';
 import { commitPartial, diffWorktreeVsHead, type PartialCommitRepo } from '../../changes/partialCommit';
 
 function git(cwd: string, ...args: string[]): string {
@@ -72,6 +72,12 @@ async function hunksFor(dir: string, rel: string, diskText: string) {
   );
 }
 
+/** Unit signatures for a worktree file vs HEAD — what a review session stores. */
+async function unitSigsFor(dir: string, rel: string, diskText: string): Promise<string[]> {
+  const hunks = await hunksFor(dir, rel, diskText);
+  return allUnitSignatures(computeChangeUnits(hunks), hunks);
+}
+
 suite('partial commit via temp index (M6.7)', () => {
   const cleanup: string[] = [];
 
@@ -108,7 +114,7 @@ suite('partial commit via temp index (M6.7)', () => {
     fs.writeFileSync(path.join(dir, 'b.txt'), 'b2\n');
     fs.writeFileSync(path.join(dir, 'c.txt'), 'untracked\n'); // untracked member
 
-    const sigs = allSignatures(await hunksFor(dir, 'a.txt', workA));
+    const sigs = await unitSigsFor(dir, 'a.txt', workA);
     const plan = new Map([['a.txt', new Set([sigs[1]!])]]); // include ONLY the l5 change
     const result = await commitPartial(repoFor(dir), ['a.txt', 'b.txt', 'c.txt'], plan, 'feat: partial');
 
@@ -146,7 +152,7 @@ suite('partial commit via temp index (M6.7)', () => {
     fs.writeFileSync(path.join(dir, 'a.txt'), 'l1\nL2\nl3\n');
     git(dir, 'add', 'a.txt'); // staged delta that will be consumed by the sync
 
-    const sigs = allSignatures(await hunksFor(dir, 'a.txt', 'l1\nL2\nl3\n'));
+    const sigs = await unitSigsFor(dir, 'a.txt', 'l1\nL2\nl3\n');
     const plan = new Map([['a.txt', new Set(sigs)]]);
     const result = await commitPartial(repoFor(dir), ['a.txt'], plan, 'feat: consume staged');
     assert.deepEqual(result.consumedStaged, ['a.txt']);
@@ -166,7 +172,7 @@ suite('partial commit via temp index (M6.7)', () => {
       fs.chmodSync(hook, 0o755);
     }
 
-    const sigs = allSignatures(await hunksFor(dir, 'a.txt', 'l1\nL2\nl3\n'));
+    const sigs = await unitSigsFor(dir, 'a.txt', 'l1\nL2\nl3\n');
     await assert.rejects(
       () => commitPartial(repoFor(dir), ['a.txt'], new Map([['a.txt', new Set(sigs)]]), 'should fail'),
       /hook|pre-commit|failed/i,
@@ -185,7 +191,7 @@ suite('partial commit via temp index (M6.7)', () => {
     const work = 'r1\r\nR2\r\nr3\r\n';
     fs.writeFileSync(path.join(dir, 'f.txt'), Buffer.from(work, 'utf8'));
 
-    const sigs = allSignatures(await hunksFor(dir, 'f.txt', work));
+    const sigs = await unitSigsFor(dir, 'f.txt', work);
     await commitPartial(repoFor(dir), ['f.txt'], new Map([['f.txt', new Set(sigs)]]), 'feat: crlf');
     assert.ok(gitRaw(dir, 'show', 'HEAD:f.txt').equals(Buffer.from(work, 'utf8')), 'blob byte-exact CRLF');
     assert.ok(!gitRaw(dir, 'show', 'HEAD:f.txt').toString('utf8').includes('\r\r'), 'no doubled carriage returns');

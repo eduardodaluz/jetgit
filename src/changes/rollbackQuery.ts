@@ -16,7 +16,7 @@
  * INCLUDED content by reverting EXCLUDED hunks to HEAD) — hunk identity via
  * content signatures from ./hunkSelection (both pure).
  */
-import { allSignatures } from './hunkSelection';
+import { allSignatures, fnv1a32 } from './hunkSelection';
 
 export interface GitCliResult {
   readonly stdout: Buffer;
@@ -316,4 +316,200 @@ export function assembleIncludedLf(
 export function restoreEol(lf: string, diskBytes: Buffer): Buffer {
   const eolCrlf = diskBytes.toString('utf8').includes('\r\n');
   return Buffer.from(eolCrlf ? lf.replace(/\n/g, '\r\n') : lf, 'utf8');
+}
+
+// ---------------------------------------------------------------------------
+// M6.7.1 — change units: per-LINE inclusion inside a hunk. git coalesces
+// adjacent changes into one hunk, but the user includes PER LINE ("check only
+// line 42"). Pure-addition runs split into per-line units, pure-deletion runs
+// into per-line units, 1:1 modification runs into per-pair units; mixed
+// blocks (unequal -/+ counts) stay ONE unit (their pairing is ambiguous
+// without an intra-block diff — the M6.7 granularity floor).
+// ---------------------------------------------------------------------------
+
+export type UnitKind = 'add' | 'del' | 'mod' | 'block';
+
+export interface ChangeUnit {
+  /** Which hunk the unit belongs to. */
+  hunkIndex: number;
+  kind: UnitKind;
+  /** 0-based indexes into the hunk's newLines (add/mod presentation lines). */
+  newIdxs: number[];
+  /** 0-based indexes into the hunk's oldLines (del/mod HEAD-side lines). */
+  oldIdxs: number[];
+}
+
+/** Splits hunks into the include-able units (see the block comment). */
+export function computeChangeUnits(hunks: readonly DiffHunk[]): ChangeUnit[] {
+  const units: ChangeUnit[] = [];
+  hunks.forEach((hunk, hunkIndex) => {
+    if (hunk.oldCount === 0) {
+      for (let i = 0; i < hunk.newLines.length; i++) {
+        units.push({ hunkIndex, kind: 'add', newIdxs: [i], oldIdxs: [] });
+      }
+      return;
+    }
+    if (hunk.newCount === 0) {
+      for (let i = 0; i < hunk.oldLines.length; i++) {
+        units.push({ hunkIndex, kind: 'del', newIdxs: [], oldIdxs: [i] });
+      }
+      return;
+    }
+    if (hunk.oldCount === hunk.newCount) {
+      for (let i = 0; i < hunk.newLines.length; i++) {
+        units.push({ hunkIndex, kind: 'mod', newIdxs: [i], oldIdxs: [i] });
+      }
+      return;
+    }
+    units.push({ hunkIndex, kind: 'block', newIdxs: hunk.newLines.map((_, i) => i), oldIdxs: hunk.oldLines.map((_, i) => i) });
+  });
+  return units;
+}
+
+/** Signature of one unit — content-based, ordinal-disambiguated (same scheme as hunks). */
+export function unitSignature(units: readonly ChangeUnit[], hunks: readonly DiffHunk[], index: number): string {
+  const unit = units[index];
+  if (!unit) {
+    return '';
+  }
+  const hunk = hunks[unit.hunkIndex];
+  if (!hunk) {
+    return '';
+  }
+  const side = (indexes: number[], lines: readonly string[]): string => indexes.map((i) => lines[i] ?? '').join('\n');
+  const base = fnv1a32(`${unit.kind}:${unit.hunkIndex}:${side(unit.oldIdxs, hunk.oldLines)}:${side(unit.newIdxs, hunk.newLines)}`);
+  let ordinal = 0;
+  for (let i = 0; i < index; i++) {
+    const other = units[i];
+    const otherHunk = other ? hunks[other.hunkIndex] : undefined;
+    if (!other || !otherHunk) {
+      continue;
+    }
+    const otherBase = fnv1a32(
+      `${other.kind}:${other.hunkIndex}:${side(other.oldIdxs, otherHunk.oldLines)}:${side(other.newIdxs, otherHunk.newLines)}`,
+    );
+    if (otherBase === base && other.kind === unit.kind) {
+      ordinal++;
+    }
+  }
+  return `${base}#${ordinal}`;
+}
+
+/** All unit signatures, in unit order. */
+export function allUnitSignatures(units: readonly ChangeUnit[], hunks: readonly DiffHunk[]): string[] {
+  return units.map((_, index) => unitSignature(units, hunks, index));
+}
+
+/**
+ * Builds the committed content when the EXCLUDED units are reverted to HEAD,
+ * unit by unit:
+ * - excluded add   → the added line is dropped from the content;
+ * - excluded mod   → the new line is replaced by its HEAD-side pair;
+ * - excluded del   → the deleted HEAD line is re-inserted at the gap;
+ * - excluded block → whole-hunk restore (same math as computeRollbackEditsForHunks).
+ * Edits target absolute DISK line numbers (hunks are computed against disk)
+ * and stay ascending/disjoint. The last edit reaching EOF takes the
+ * headLf-slice rule exactly like computeRollbackEditsForHunks.
+ */
+export function assembleExcludedUnitsLf(
+  headLf: string,
+  diskLf: string,
+  hunks: readonly DiffHunk[],
+  units: readonly ChangeUnit[],
+  excludedUnits: readonly ChangeUnit[],
+): { contentLf: string | undefined; matched: number; total: number } {
+  const total = units.length;
+  // Walk hunks in order with a buffer-line cursor: unchanged lines flow
+  // through untouched; each hunk's units decide worktree-vs-HEAD lines for
+  // their slice (included → worktree, excluded → HEAD). No offset algebra,
+  // no EOF cases.
+  const headLines = splitLfLines(headLf);
+  const bufferLines = splitLfLines(diskLf);
+  const excluded = new Set(excludedUnits);
+  const out: string[] = [];
+  const unitsByHunk = new Map<number, ChangeUnit[]>();
+  for (const unit of units) {
+    const list = unitsByHunk.get(unit.hunkIndex) ?? [];
+    list.push(unit);
+    unitsByHunk.set(unit.hunkIndex, list);
+  }
+
+  let cursor = 0; // next buffer line not yet emitted
+  hunks.forEach((hunk, hunkIndex) => {
+    const hunkUnits = unitsByHunk.get(hunkIndex) ?? [];
+    const baseNew = Math.min(hunk.newCount > 0 ? hunk.newStart - 1 : hunk.newStart, bufferLines.length);
+    // Unchanged lines between the cursor and this hunk.
+    for (let i = cursor; i < baseNew && i < bufferLines.length; i++) {
+      const line = bufferLines[i];
+      if (line !== undefined) {
+        out.push(line);
+      }
+    }
+    for (const unit of hunkUnits) {
+      const isExcluded = excluded.has(unit);
+      if (unit.kind === 'add') {
+        if (!isExcluded) {
+          for (const i of unit.newIdxs) {
+            const line = bufferLines[baseNew + i];
+            if (line !== undefined) {
+              out.push(line);
+            }
+          }
+        } // excluded add → the line does not join the commit
+      } else if (unit.kind === 'mod') {
+        if (isExcluded) {
+          const headLine = headLines[hunk.oldStart - 1 + (unit.oldIdxs[0] ?? 0)];
+          if (headLine !== undefined) {
+            out.push(headLine);
+          }
+        } else {
+          const line = bufferLines[baseNew + (unit.newIdxs[0] ?? 0)];
+          if (line !== undefined) {
+            out.push(line);
+          }
+        }
+      } else if (unit.kind === 'del') {
+        if (isExcluded) {
+          for (const i of unit.oldIdxs) {
+            const headLine = headLines[hunk.oldStart - 1 + i];
+            if (headLine !== undefined) {
+              out.push(headLine);
+            }
+          }
+        } // included del → nothing (the lines stay absent)
+      } else {
+        // block: whole hunk — excluded → HEAD side; included → worktree side.
+        if (isExcluded) {
+          const from = Math.max(hunk.oldStart - 1, 0);
+          for (let i = from; i < from + hunk.oldCount && i < headLines.length; i++) {
+            const line = headLines[i];
+            if (line !== undefined) {
+              out.push(line);
+            }
+          }
+        } else {
+          for (let i = baseNew; i < baseNew + Math.max(hunk.newCount, 0) && i < bufferLines.length; i++) {
+            const line = bufferLines[i];
+            if (line !== undefined) {
+              out.push(line);
+            }
+          }
+        }
+      }
+    }
+    cursor = baseNew + Math.max(hunk.newCount, 0);
+  });
+  // Trailing unchanged lines after the last hunk.
+  for (let i = cursor; i < bufferLines.length; i++) {
+    const line = bufferLines[i];
+    if (line !== undefined) {
+      out.push(line);
+    }
+  }
+
+  const matched = total - excludedUnits.length;
+  const trailingEol = diskLf.endsWith('\n') ? '\n' : '';
+  const contentLf = out.length === 0 ? '' : out.join('\n') + trailingEol;
+  const final = contentLf === headLf ? undefined : contentLf;
+  return { contentLf: final, matched, total };
 }

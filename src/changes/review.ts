@@ -18,9 +18,15 @@ import { looksBinary } from '../common/fsutil';
 import type { GitApiService, RepoHandle } from '../git/gitApi';
 import { refContent } from '../blame/blameQuery';
 import { Strings } from '../strings';
-import { allSignatures, effectiveSignatures, HunkSelectionStore, entryState } from './hunkSelection';
+import { effectiveSignatures, HunkSelectionStore, entryState } from './hunkSelection';
 import { commitPartial, diffWorktreeVsHead, type PartialCommitRepo, type PartialPlan } from './partialCommit';
-import type { DiffHunk, RollbackAdapter } from './rollbackQuery';
+import {
+  allUnitSignatures,
+  computeChangeUnits,
+  type ChangeUnit,
+  type DiffHunk,
+  type RollbackAdapter,
+} from './rollbackQuery';
 
 const BINARY_SNIFF_BYTES = 8192;
 
@@ -72,12 +78,16 @@ export class ChangesReviewController {
       if (hunks.length === 0) {
         this.store.closeSession(repoKey, relPath);
       } else {
-        this.store.openSession(repoKey, relPath, allSignatures(hunks));
+        this.store.openSession(repoKey, relPath, allUnitSignatures(computeChangeUnits(hunks), hunks));
         this.hunkCache.delete(fileUri.toString()); // display recomputes against the live document
       }
     } catch (err) {
-      // Session opening is best-effort; the commit still works whole-file.
-      void err;
+      // A missing checkbox row with NO error is a support puzzle — surface it.
+      void vscode.window.showErrorMessage(
+        Strings.changes.hunkSessionFailed
+          .replace('{path}', relPath)
+          .replace('{reason}', err instanceof Error ? err.message : String(err)),
+      );
     }
   }
 
@@ -228,18 +238,24 @@ export class ChangesReviewController {
     if (!session) {
       return [];
     }
+    const units = computeChangeUnits(hunks);
     const lenses: vscode.CodeLens[] = [];
     const lineCount = document.lineCount;
-    hunks.forEach((hunk, index) => {
+    units.forEach((unit, index) => {
       const sig = session.signatures[index];
-      const startLine = Math.min(Math.max(hunk.newStart - 1, 0), Math.max(lineCount - 1, 0));
-      const range = new vscode.Range(startLine, 0, startLine, 0);
+      const hunk = hunks[unit.hunkIndex];
+      if (!hunk) {
+        return;
+      }
+      const range = this.unitRange(hunk, unit, lineCount);
       if (index === 0) {
         const included = effectiveSignatures(session).length;
         const counter = new vscode.CodeLens(range); // no command — renders as inert text
         counter.command = {
           command: '',
-          title: Strings.changes.hunkLensCounter.replace('{total}', String(hunks.length)).replace('{included}', String(included)),
+          title: Strings.changes.hunkLensCounter
+            .replace('{total}', String(units.length))
+            .replace('{included}', String(included)),
         };
         lenses.push(counter);
       }
@@ -253,6 +269,22 @@ export class ChangesReviewController {
       );
     });
     return lenses;
+  }
+
+  /** Where a unit's lens/mark lives: the changed line itself (gap line for deletions). */
+  private unitRange(hunk: DiffHunk, unit: ChangeUnit, lineCount: number): vscode.Range {
+    const clamp = (n: number): number => Math.min(Math.max(n, 0), Math.max(lineCount - 1, 0));
+    if (unit.kind === 'del') {
+      const line = clamp(hunk.newStart);
+      return new vscode.Range(line, 0, line, 0);
+    }
+    if (unit.kind === 'block') {
+      const first = hunk.newCount > 0 ? hunk.newStart - 1 : hunk.newStart;
+      const start = clamp(first);
+      return new vscode.Range(start, 0, clamp(start + Math.max(hunk.newCount, 1) - 1), 0);
+    }
+    const line = clamp(hunk.newStart - 1 + (unit.newIdxs[0] ?? 0));
+    return new vscode.Range(line, 0, line, 0);
   }
 
   /** Signature-validated toggle from a lens click. */
@@ -291,7 +323,7 @@ export class ChangesReviewController {
       }
       const hunks = await diffWorktreeVsHead(this.adapterFor(repo), headBytes, document.getText());
       this.hunkCache.set(key, { version: document.version, hunks });
-      this.store.refreshSignatures(repoKey, relPath, allSignatures(hunks));
+      this.store.refreshSignatures(repoKey, relPath, allUnitSignatures(computeChangeUnits(hunks), hunks));
       return hunks;
     })().finally(() => this.inFlight.delete(key));
     this.inFlight.set(key, promise);
@@ -331,15 +363,14 @@ export class ChangesReviewController {
       const includedRanges: vscode.Range[] = [];
       const excludedRanges: vscode.Range[] = [];
       const lineCount = editor.document.lineCount;
-      cached.hunks.forEach((hunk, index) => {
+      const units = computeChangeUnits(cached.hunks);
+      units.forEach((unit, index) => {
         const sig = session.signatures[index];
-        if (sig === undefined) {
+        const hunk = cached.hunks[unit.hunkIndex];
+        if (sig === undefined || !hunk) {
           return;
         }
-        const startLine = Math.min(Math.max(hunk.newStart - 1, 0), Math.max(lineCount - 1, 0));
-        const span = Math.max(hunk.newCount, 1);
-        const range = new vscode.Range(startLine, 0, Math.min(startLine + span - 1, lineCount - 1), 0);
-        (session.included.has(sig) ? includedRanges : excludedRanges).push(range);
+        (session.included.has(sig) ? includedRanges : excludedRanges).push(this.unitRange(hunk, unit, lineCount));
       });
       editor.setDecorations(this.includedType, includedRanges);
       editor.setDecorations(this.excludedType, excludedRanges);

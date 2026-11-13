@@ -26,7 +26,9 @@ import { refContent } from '../blame/blameQuery';
 import { ensureTmp, GitCli, TempBufferFile, TempTextFile, withPathspecFiles, pathspecArgs } from '../git/gitCli';
 import { literalPathspec } from '../shelf/patchBuilder';
 import {
-  assembleIncludedLf,
+  allUnitSignatures,
+  assembleExcludedUnitsLf,
+  computeChangeUnits,
   parseHunks,
   restoreEol,
   toLf,
@@ -176,12 +178,20 @@ export async function commitPartial(repo: PartialCommitRepo, members: readonly s
           const headLf = toLf(headBytes.toString('utf8'));
           const diskLf = toLf(disk.toString('utf8'));
           const hunks = await diffWorktreeVsHead(adapter, headBytes, disk.toString('utf8'));
-          const assembled = assembleIncludedLf(headLf, diskLf, hunks, partialSigs);
+          // Per-LINE units (M6.7.1): the plan carries unit signatures from the
+          // review session — additions/deletions/mod-pairs are individually
+          // include-able; mixed blocks stay whole-hunk.
+          const units = computeChangeUnits(hunks);
+          const unitSigs = allUnitSignatures(units, hunks);
+          const matched = unitSigs.filter((sig) => partialSigs.has(sig)).length;
+          if (matched === 0) {
+            stale.push(rel);
+            continue;
+          }
+          const excludedUnits = units.filter((_, index) => !partialSigs.has(unitSigs[index] ?? ''));
+          const assembled = assembleExcludedUnitsLf(headLf, diskLf, hunks, units, excludedUnits);
           if (assembled.contentLf === undefined) {
-            // Stale signatures or the included hunks net to HEAD: skip the file.
-            if (assembled.matched === 0) {
-              stale.push(rel);
-            }
+            // The included units net out to HEAD — nothing to commit here.
             continue;
           }
           contentBytes = restoreEol(assembled.contentLf, disk);

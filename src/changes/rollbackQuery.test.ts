@@ -7,8 +7,11 @@
 import { describe, expect, it } from 'vitest';
 import { allSignatures } from './hunkSelection';
 import {
+  allUnitSignatures,
   applyLineEdits,
+  assembleExcludedUnitsLf,
   assembleIncludedLf,
+  computeChangeUnits,
   computeRollbackEdits,
   parseHunks,
   splitLfLines,
@@ -344,5 +347,75 @@ describe('M6.7 — assembly by hunk identity (partial commit content)', () => {
       { startLine: 3, endLineExclusive: 4, text: '', touchesDocumentEnd: false },
     ];
     expect(applyLineEdits('a\nb\nc\nd\n', edits)).toBe('a\nX\nc\n');
+  });
+});
+
+describe('M6.7.1 — per-line change units (the "check only line 42" case)', () => {
+  it('a coalesced 3-line addition block splits into 3 per-line units', () => {
+    // Real git shape: lines 42–44 added in one contiguous block → ONE hunk.
+    const units = computeChangeUnits(parseHunks('@@ -41,0 +42,3 @@\n+line42\n+line43\n+line44\n'));
+    expect(units).toHaveLength(3);
+    expect(units.every((u) => u.kind === 'add')).toBe(true);
+    expect(units.map((u) => u.newIdxs[0])).toEqual([0, 1, 2]);
+    // Each unit has its own content signature.
+    const sigs = allUnitSignatures(units, parseHunks('@@ -41,0 +42,3 @@\n+line42\n+line43\n+line44\n'));
+    expect(new Set(sigs).size).toBe(3);
+  });
+
+  it('THE user case: include line 42 only — the committed content has just that line', () => {
+    // Three lines inserted after l41 (real git header verified: -2,0 +3,3).
+    const headLf = 'l40\nl41\nl45\n';
+    const diskLf = 'l40\nl41\nline42\nline43\nline44\nl45\n';
+    const hunks = parseHunks('@@ -2,0 +3,3 @@\n+line42\n+line43\n+line44\n');
+    const units = computeChangeUnits(hunks);
+    expect(units.map((u) => u.kind)).toEqual(['add', 'add', 'add']);
+
+    // Include ONLY the first added line (42); 43/44 stay local edits.
+    const { contentLf } = assembleExcludedUnitsLf(headLf, diskLf, hunks, units, [units[1]!, units[2]!]);
+    expect(contentLf).toBe('l40\nl41\nline42\nl45\n');
+
+    // And the mirror: only 44 → 42/43 stay out.
+    const onlyLast = assembleExcludedUnitsLf(headLf, diskLf, hunks, units, [units[0]!, units[1]!]);
+    expect(onlyLast.contentLf).toBe('l40\nl41\nline44\nl45\n');
+  });
+
+  it('pure-deletion runs split per deleted line; excluded deletions restore', () => {
+    const headLf = 'a\nb\nc\nd\n';
+    const diskLf = 'a\n';
+    const hunks = parseHunks('@@ -2,2 +1,0 @@\n-b\n-c\n');
+    const units = computeChangeUnits(hunks);
+    expect(units.every((u) => u.kind === 'del')).toBe(true);
+    // Restore b (exclude its deletion), keep c deleted.
+    const { contentLf } = assembleExcludedUnitsLf(headLf, diskLf, hunks, units, [units[0]!]);
+    expect(contentLf).toBe('a\nb\n');
+  });
+
+  it('1:1 modification runs split per pair; excluded pairs keep the HEAD line', () => {
+    const headLf = 'a\nb\nc\n';
+    const diskLf = 'a\nB\nC\n';
+    const hunks = parseHunks('@@ -2,2 +2,2 @@\n-b\n-c\n+B\n+C\n');
+    const units = computeChangeUnits(hunks);
+    expect(units.map((u) => u.kind)).toEqual(['mod', 'mod']);
+    const { contentLf } = assembleExcludedUnitsLf(headLf, diskLf, hunks, units, [units[0]!]);
+    expect(contentLf).toBe('a\nb\nC\n');
+  });
+
+  it('mixed blocks (unequal counts) stay ONE block unit', () => {
+    const units = computeChangeUnits(parseHunks('@@ -2,2 +2,3 @@\n-b\n-c\n+B\n+C\n+D\n'));
+    expect(units).toHaveLength(1);
+    expect(units[0]?.kind).toBe('block');
+  });
+
+  it('unit exclusion at EOF keeps the trailing-newline rule', () => {
+    const headLf = 'a\nb\n';
+    const diskLf = 'a\nb\nx\n';
+    const hunks = parseHunks('@@ -2,0 +3 @@\n+x\n');
+    const units = computeChangeUnits(hunks);
+    const sigs = allUnitSignatures(units, hunks);
+    const { contentLf } = assembleExcludedUnitsLf(headLf, diskLf, hunks, units, []);
+    expect(contentLf).toBe(diskLf); // all included
+    const none = assembleExcludedUnitsLf(headLf, diskLf, hunks, units, units);
+    expect(none.contentLf).toBeUndefined(); // everything excluded nets to HEAD
+    void sigs;
   });
 });
